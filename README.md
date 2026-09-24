@@ -13,7 +13,7 @@ language models read with far fewer tokens. You can convert it back without losi
   TypeScript.
 * **One command, one dependency.** `pip install`, then `bpp data.json`.
 
-🇹🇷 Türkçe: [README.tr.md](README.tr.md)
+🇹🇷 Türkçe: [README.tr.md](https://github.com/E7lektronXF/bpp/blob/main/README.tr.md)
 
 ```
 JSON, pretty-printed (146 tokens)                  bpp (53 tokens)
@@ -43,7 +43,7 @@ Token counts per format for six example files (o200k tokenizer; fewer is better)
 
 Anthropic's published Claude tokenizer (`claude2`) shows the same picture: −59% vs JSON, −30% vs
 TOON. The full tables, the method and the cases where bpp wins by less are in
-[BENCHMARK.md](BENCHMARK.md).
+[BENCHMARK.md](https://github.com/E7lektronXF/bpp/blob/main/BENCHMARK.md).
 
 ## Quick start
 
@@ -177,7 +177,7 @@ steps[5]{status? note?= title}>steps
   done Pazarlama analitiği
 ```
 
-The full grammar and the measurement behind each rule are in [SPEC.md](SPEC.md).
+The full grammar and the measurement behind each rule are in [SPEC.md](https://github.com/E7lektronXF/bpp/blob/main/SPEC.md).
 
 ## Why it is smaller
 
@@ -275,4 +275,4 @@ tests/         pytest + hypothesis
 
 ## License
 
-[MIT](LICENSE)
+[MIT](https://github.com/E7lektronXF/bpp/blob/main/LICENSE)
