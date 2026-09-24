@@ -1,50 +1,52 @@
-# BENCHMARK — .bpp gerçekten işe yarıyor mu?
+# BENCHMARK — does .bpp actually work?
 
-Kısa cevap: **token tarafında evet, ölçüldü. Anlama tarafında henüz bilinmiyor**, çünkü bu
-ortamda `ANTHROPIC_API_KEY` yoktu. Anlama testi yazıldı ve çalışmaya hazır (§3). Aşağıdaki her
-sayı depodaki betiklerle yeniden üretilebilir:
+> Türkçe: [BENCHMARK.tr.md](BENCHMARK.tr.md)
+
+Short answer: **on tokens, yes, and it is measured. On comprehension, not yet known**: no
+`ANTHROPIC_API_KEY` was available when these results were produced. The comprehension benchmark
+is written and ready to run (§3). Every number below can be reproduced with the scripts in the
+repository:
 
 ```bash
-python bench/make_examples.py   # examples/ klasörünü üretir
+python bench/make_examples.py   # generates the examples/ folder
 python bench/run_tokens.py      # -> bench/results/tokens.md, tokens.json
-python bench/run_qa.py          # -> bench/results/qa.md (API anahtarı gerekir)
+python bench/run_qa.py          # -> bench/results/qa.md (needs an API key)
 ```
 
-## 1. Yöntem
+## 1. Method
 
-**Veriler** (`examples/`):
+**Data** (`examples/`):
 
-| örnek | dosya | içerik |
+| example | file | contents |
 |---|---|---|
-| employees | `employees.csv` | Düz tablo: 60 çalışan × 10 sütun, Türkçe isim/şehirler |
-| config | `config.yaml` | İç içe servis konfigürasyonu (4 seviye, küçük tablolar, listeler) |
-| plan | `plan.json` | Yapılandırılmış plan: 6 adım + 21 alt adım; `id`, `status`, `priority`, `deps`, `owner`, `note` |
-| project_plan | `project_plan.md` | Uzun Markdown plan: başlıklar, iç içe checkbox listeleri, notlar, kod bloğu |
-| orders | `orders.json` | Karışık yapı: API yanıtı, 20 sipariş, iç içe müşteri nesnesi, kalem tabloları, serbest metin |
-| logs | `logs.json` | 80 log kaydı; uzun değerler (mesaj, servis adı) çok tekrarlı |
+| employees | `employees.csv` | Flat table: 60 employees × 10 columns, Turkish names and cities |
+| config | `config.yaml` | Nested service configuration (4 levels, small tables, lists) |
+| plan | `plan.json` | Structured plan: 6 steps + 21 sub-steps with `id`, `status`, `priority`, `deps`, `owner`, `note` |
+| project_plan | `project_plan.md` | Long Markdown plan: headings, nested checkbox lists, notes, a code block |
+| orders | `orders.json` | Mixed structure: an API response with 20 orders, nested customer objects, line-item tables and free text |
+| logs | `logs.json` | 80 log entries; long values (message, service name) repeat a lot |
 
-**Formatlar:** JSON (2 boşluk girinti), minified JSON, YAML (PyYAML, `allow_unicode`), CSV
-(yalnızca düz tablolarda), Markdown (yalnızca md örneğinde, kaynak dosya), TOON (referans
-`@toon-format/toon` 4.1.1, varsayılan ayarlar), `.bpp` (varsayılan ayarlar) ve `.bpp` + 1 satır
-primer.
+**Formats:** JSON (2-space indent), minified JSON, YAML (PyYAML, `allow_unicode`), CSV (flat tables
+only), Markdown (the md example only, source file), TOON (reference `@toon-format/toon` 4.1.1,
+default settings), `.bpp` (default settings) and `.bpp` with the 1-line primer.
 
-**Token sayaçları:**
+**Token counters:**
 
-* **o200k** — tiktoken `o200k_base`.
-* **claude2** — Anthropic'in yayımladığı eski Claude tokenizer'ı (`@anthropic-ai/tokenizer`).
+* **o200k**: tiktoken `o200k_base`.
+* **claude2**: Anthropic's published legacy Claude tokenizer (`@anthropic-ai/tokenizer`).
 
-İkisi de güncel Claude modellerinin tokenizer'ı **değildir**. Anthropic dokümanına göre
-tiktoken, Claude token'larını tipik metinde %15–20, Türkçe gibi İngilizce dışı metinde daha fazla
-eksik sayar. Mutlak sayılar bu yüzden temsili değildir; güvenilen şey formatlar arasındaki
-göreli farktır. İki bağımsız tokenizer'ın aynı yönde sonuç vermesi bu farkların tokenizer'a özgü
-olmadığına işaret eder. `ANTHROPIC_API_KEY` tanımlıysa `run_tokens.py` ve `bpp stats` gerçek
-`count_tokens` sonucunu üçüncü sütun olarak ekler.
+Neither is the tokenizer of current Claude models. According to Anthropic's documentation,
+tiktoken undercounts Claude tokens by 15–20% on typical text and by more on non-English text such
+as Turkish. The absolute numbers are therefore not representative; what we rely on is the
+relative difference between formats. Two independent tokenizers pointing the same way suggests
+the differences are not an artifact of one tokenizer. With `ANTHROPIC_API_KEY` set, `run_tokens.py`
+and `bpp stats` add real `count_tokens` results as a third column.
 
-## 2. Token sonuçları
+## 2. Token results
 
 ### o200k
 
-| örnek | JSON | JSON min | YAML | CSV | Markdown | TOON | **bpp** | bpp+primer | bpp vs en iyi rakip |
+| example | JSON | JSON min | YAML | CSV | Markdown | TOON | **bpp** | bpp+primer | bpp vs best alternative |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---|
 | employees | 5538 | 3562 | 4388 | 2165 | – | 2277 | **2042** | 2112 | **-5.7%** (CSV) |
 | config | 601 | 365 | 443 | – | – | 399 | **323** | 393 | **-11.5%** (JSON min) |
@@ -52,11 +54,11 @@ olmadığına işaret eder. `ANTHROPIC_API_KEY` tanımlıysa `run_tokens.py` ve 
 | project_plan | 1501 | 1025 | 1119 | – | 837 | 1093 | **792** | 862 | **-5.4%** (Markdown) |
 | orders | 3524 | 2231 | 2636 | – | – | 2276 | **1762** | 1832 | **-21.0%** (JSON min) |
 | logs | 5629 | 4109 | 4587 | 3185 | – | 3348 | **1857** | 1927 | **-41.7%** (CSV) |
-| **toplam** | 18402 | 12282 | 14385 | | | 10621 | **7412** | 7832 | JSON'a göre **-59.7%**, TOON'a göre **-30.2%** |
+| **total** | 18402 | 12282 | 14385 | | | 10621 | **7412** | 7832 | **-59.7%** vs JSON, **-30.2%** vs TOON |
 
 ### claude2
 
-| örnek | JSON | JSON min | YAML | CSV | Markdown | TOON | **bpp** | bpp+primer | bpp vs en iyi rakip |
+| example | JSON | JSON min | YAML | CSV | Markdown | TOON | **bpp** | bpp+primer | bpp vs best alternative |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---|
 | employees | 5669 | 3984 | 4072 | 2501 | – | 2496 | **2084** | 2158 | **-16.5%** (TOON) |
 | config | 611 | 393 | 417 | – | – | 389 | **332** | 406 | **-14.7%** (TOON) |
@@ -64,93 +66,93 @@ olmadığına işaret eder. `ANTHROPIC_API_KEY` tanımlıysa `run_tokens.py` ve 
 | project_plan | 1737 | 1265 | 1288 | – | 1078 | 1273 | **1017** | 1091 | **-5.7%** (Markdown) |
 | orders | 3615 | 2455 | 2526 | – | – | 2342 | **1839** | 1913 | **-21.5%** (TOON) |
 | logs | 5563 | 4199 | 4456 | 3249 | – | 3332 | **1800** | 1874 | **-44.6%** (CSV) |
-| **toplam** | 18914 | 13374 | 14007 | | | 11089 | **7800** | 8244 | JSON'a göre **-58.8%**, TOON'a göre **-29.7%** |
+| **total** | 18914 | 13374 | 14007 | | | 11089 | **7800** | 8244 | **-58.8%** vs JSON, **-29.7%** vs TOON |
 
-Ayrıntılı tablolar (sözlüksüz `--no-refs` varyantı dahil): `bench/results/tokens.md`.
+Detailed tables, including the dictionary-free `--no-refs` variant: `bench/results/tokens.md`.
 
-### 2.1 Kazancın kaynakları
+### 2.1 Where the savings come from
 
-| kaynak | nerede | etkisi |
+| source | where | effect |
 |---|---|---|
-| Anahtarların bir kez yazılması (tablolar) | employees, logs, orders kalemleri, replicas | JSON'a göre −%55…−%60; CSV/TOON ile aynı mekanizma |
-| Boşlukla ayrılmış satırlar (`,` yerine) | tüm tablolar | virgüllü tabloya göre −%12 (o200k) / −%22 (claude2). Boşluk bir sonraki token'a kaynaşıyor, virgül kaynaşmıyor |
-| `key value` (`:` yok), 1 boşluk girinti | config, orders | `key:value`'ya göre −%3…−%8 |
-| Sözlük (`&n` / `*n`) | logs, orders | logs'ta sözlüksüz haline göre −%36 / −%39; orders'ta −%4.5 / −%7.3 |
-| Ağaç satırları (`>steps`) | plan | JSON min'e göre −%36; iç içe nesneler yerine girintili satırlar |
-| Pozisyonel opsiyonel sütun (`status?`, eksikse `-`) — bpp2 | project_plan | bpp1'e göre −%7.6 / −%6.1; kaynak Markdown'ı geçmesini sağlayan değişiklik |
-| Minimum tırnak + ham UTF-8 | her yerde | `\u` escape'i Türkçe metinde +%124…+%161 token olurdu |
+| Keys written once (tables) | employees, logs, order line items, replicas | 55–60% smaller than JSON; the same mechanism as CSV/TOON |
+| Space-delimited rows (instead of `,`) | every table | 12% (o200k) / 22% (claude2) smaller than comma tables. A space merges into the next token; a comma does not |
+| `key value` (no `:`), 1-space indent | config, orders | 3–8% smaller than `key:value` |
+| Dictionary (`&n` / `*n`) | logs, orders | logs: 36% / 39% smaller than without it; orders: 4.5% / 7.3% |
+| Tree rows (`>steps`) | plan | 36% smaller than minified JSON; indented rows instead of nested objects |
+| Positional optional column (`status?`, `-` when absent), bpp2 | project_plan | 7.6% / 6.1% smaller than bpp1; the change that made it beat the source Markdown |
+| Minimal quoting + raw UTF-8 | everywhere | `\u` escapes would cost 124–161% more tokens on Turkish text |
 
-**Sözlüğün payı:** logs örneğindeki büyük farkın çoğu sözlükten geliyor. Sözlük kapatıldığında
-(`--no-refs`) .bpp logs'ta 2921 / 2952 token, yani CSV'den yalnızca −%8 / −%9 ucuz. TOON'da sözlük
-mekanizması yoktur.
+**How much comes from the dictionary:** most of the big gap on the logs example comes from the
+dictionary. With it disabled (`--no-refs`), .bpp takes 2921 / 2952 tokens on logs, only 8% / 9%
+less than CSV. TOON has no dictionary mechanism.
 
-## 3. Anlama testi (çalıştırılmadı)
+## 3. Comprehension benchmark (not yet run)
 
-`bench/run_qa.py` her örnek için veriden hesaplanan cevaplarıyla **10 soru** üretir:
+For each example, `bench/run_qa.py` generates **10 questions** whose answers are computed from
+the data:
 
-* doğrudan erişim ("id 17'nin adı"),
-* iç içe erişim ("ikinci replika host'u"),
-* sayma ("kaç sipariş iptal edilmiş"),
-* bağımlılık ve ebeveyn ilişkisi ("5.2 hangi adımlara bağlı"),
-* sözlük referansı çözme (logs'taki mesajlar).
+* direct lookup ("name of id 17"),
+* nested lookup ("host of the second replica"),
+* counting ("how many orders are cancelled"),
+* dependencies and parents ("which steps does 5.2 depend on"),
+* resolving dictionary references (the log messages).
 
-Aynı sorular her formattaki veriyle birlikte tek istekte Claude'a sorulur. Cevaplar otomatik
-notlanır: sayısal karşılaştırma, liste için küme eşitliği, metin için normalize eşitlik.
-`--dry-run` tüm soruları ve beklenen cevapları gösterir; notlama mantığı `tests/test_bench.py`
-ile test edilir.
+The same questions are sent to Claude together with the data in each format, one request per
+format. Answers are graded automatically: numeric comparison for numbers, set equality for lists
+and normalized equality for text. `--dry-run` prints all questions and expected answers, and the
+grading logic is covered by `tests/test_bench.py`.
 
 ```bash
 pip install ".[api]"
 export ANTHROPIC_API_KEY=...
-python bench/run_qa.py --dry-run                   # soruları ve beklenen cevapları gör
-python bench/run_qa.py                             # claude-opus-5, effort low, 1 tekrar
-python bench/run_qa.py --repeats 3 --effort high   # daha sağlam ölçüm
+python bench/run_qa.py --dry-run                   # see questions and expected answers
+python bench/run_qa.py                             # claude-opus-5, effort low, 1 repeat
+python bench/run_qa.py --repeats 3 --effort high   # a more robust measurement
 python bench/run_qa.py --model claude-sonnet-5 --examples plan logs
 ```
 
-Varsayılan çalıştırma 39 istek ve ~60 bin giriş token'ıdır. Refusal fallback bilerek **kapalıdır**:
-bir fallback başka bir modelle cevap verip karşılaştırmayı bozardı. Refusal'lar yanlış sayılır ve
-raporlanır.
+The default run is 39 requests and about 60k input tokens. Refusal fallback is deliberately
+**off**: a fallback would answer with a different model and spoil the comparison. Refusals count
+as wrong answers and are reported.
 
-**Anlama tarafındaki riskler (hipotezler, ölçülmedi):**
+**Comprehension risks (hypotheses, not measured):**
 
-1. **Sözlük dolaylılığı.** Model `*3`'ü `&3` tanımına çözmek zorunda. Logs'taki "şu mesaja sahip
-   kaç kayıt var" sorusu tam bunu ölçer. En büyük kazanç (logs −%42) en büyük anlama riskini
-   de taşıyor.
-2. **Başlık–sütun eşleme.** 10 sütunlu boşluklu satırlarda modelin değerleri doğru sütuna
-   eşlemesi gerekir. Değerler sıralı ve başlık bir kez yazılı. CSV/TOON ile aynı zorluk, ama
-   ayraç olarak virgül yerine boşluk var.
-3. **İki nokta üst üste olmayan `key value`.** YAML/TOML'a göre daha az sinyal taşıyor.
-4. **Primer'siz okuma.** `x?` ve `>steps` gibi gösterimler primer olmadan tahmin edilebilir mi?
-   Bu yüzden testte primer'li ve primer'siz .bpp ayrı satırlar olarak yer alıyor.
+1. **Dictionary indirection.** The model has to resolve `*3` to the `&3` definition. The logs
+   question "how many entries have this message" measures exactly this. The biggest saving
+   (logs −42%) also carries the biggest comprehension risk.
+2. **Header-to-column mapping.** In space-delimited rows with 10 columns, the model has to map
+   each value to the right column. Values are in order and the header is written once. This is
+   the same challenge as CSV/TOON, with spaces instead of commas as the delimiter.
+3. **`key value` without a colon** carries less signal than YAML/TOML.
+4. **Reading without the primer.** Can notations like `x?` and `>steps` be guessed without a
+   primer? That is why the benchmark lists .bpp with and without the primer as separate rows.
 
-## 4. Kaybedilen kategoriler ve nedenleri
+## 4. Losing categories and why
 
-### 4.1 Markdown checklist planı — `bpp1`'de kaybediyordu, `bpp2`'de çözüldü
+### 4.1 Markdown checklist plan: lost in `bpp1`, fixed in `bpp2`
 
-**bpp1'deki durum:** kaynak Markdown .bpp'den +%2.4 / +%0.5 daha ucuzdu (837'ye karşı 857 token).
+**In bpp1:** the source Markdown was 2.4% / 0.5% cheaper than .bpp (837 vs 857 tokens).
 
-**Neden:** Plan satırlarının çoğunda `status` var ama hepsinde değil (başlıklar ve bazı maddeler
-checkbox'sız). Bu yüzden `status` opsiyonel sütundu ve her satıra `status=done ` yazılıyordu
-(3–4 token). Markdown'da aynı bilgi `[x]` (1–2 token). İkinci, daha küçük etken: notlar
-`note="..."` olarak tırnaklanıp satır sonları `\n` ile escape ediliyor. Markdown'da aynı notlar
-girintili düz satırlar.
+**Why:** most plan rows have a `status`, but not all of them (headings and some items have no
+checkbox). So `status` was an optional column, and every row carried `status=done ` (3–4 tokens).
+Markdown says the same with `[x]` (1–2 tokens). A second, smaller factor: notes are quoted as
+`note="..."` with line breaks escaped as `\n`, whereas in Markdown the same notes are plain
+indented lines.
 
-**Prototip ölçümü** (aynı veri, elle üretilmiş varyantlar):
+**Prototype measurement** (same data, hand-built variants):
 
-| varyant | o200k | claude2 |
+| variant | o200k | claude2 |
 |---|---:|---:|
 | bpp1 (`status=done`, `note="…"`) | 857 | 1083 |
-| status pozisyonel, eksik değer `-` | **786** | **1011** |
-| status checkbox `[x]` olarak | 827 | 1058 |
-| not metin bloğu (girintili satırlar) | 842 | 1064 |
-| checkbox + metin bloğu | 817 | 1044 |
-| Markdown (kaynak) | 837 | 1078 |
+| status positional, `-` when missing | **786** | **1011** |
+| status as a checkbox `[x]` | 827 | 1058 |
+| note as a text block (indented lines) | 842 | 1064 |
+| checkbox + text block | 817 | 1044 |
+| Markdown (source) | 837 | 1078 |
 
-**Çözüm — R1, `bpp2`'de uygulandı:** Çoğu satırda bulunan opsiyonel sütun artık pozisyonel
-yazılıyor; eksik değer `-` ile gösteriliyor ve başlıkta `status?` olarak işaretleniyor. Seyrek
-sütunlar `note?=` olarak `note=...` biçiminde kalıyor. Encoder seçimi sütun bazında maliyet
-karşılaştırmasıyla yapıyor.
+**Fix: R1, implemented in `bpp2`.** An optional column present in most rows is now written
+positionally, shown as `-` when missing and marked `status?` in the header. Sparse columns stay
+keyed as `note?=` and are written `note=...`. The encoder chooses per column by comparing costs.
 
 ```
 steps[5]{status? note?= title}>steps
@@ -162,39 +164,39 @@ steps[5]{status? note?= title}>steps
 | | o200k | claude2 |
 |---|---:|---:|
 | bpp1 | 857 | 1083 |
-| **bpp2** | **792** (−%7.6) | **1017** (−%6.1) |
-| Markdown (kaynak) | 837 | 1078 |
-| bpp2, Markdown'a göre | **−%5.4** | **−%5.7** |
+| **bpp2** | **792** (−7.6%) | **1017** (−6.1%) |
+| Markdown (source) | 837 | 1078 |
+| bpp2 vs Markdown | **−5.4%** | **−5.7%** |
 
-Prototipteki 786 ile gerçek encoder'ın 792'si arasındaki fark başlık gösteriminden geliyor
-(`status? note?=`). Bedeli: yalnızca anahtarlı opsiyonel sütun içeren tablolarda başlık sütun başına
-bir `=` uzuyor (`plan.json`: 634 → 636). Diğer örneklerde değişiklik yok.
+The difference between the prototype (786) and the real encoder (792) comes from the header
+notation (`status? note?=`). The cost: in tables with keyed optional columns, the header grows by
+one `=` per such column (`plan.json`: 634 → 636). The other examples are unchanged.
 
-**Kalan açık:** primer eklenince .bpp bu örnekte yine Markdown'dan pahalı (862'ye karşı 837,
-claude2'de 1091'e karşı 1078). Markdown'u her LLM zaten tanır; .bpp'nin primer'siz anlaşılıp
-anlaşılmadığı anlama testiyle ölçülmeli (§3).
+**Still open:** with the primer, .bpp is again more expensive than Markdown on this example (862
+vs 837; 1091 vs 1078 on claude2). Every LLM already knows Markdown; whether .bpp is understood
+without the primer has to be measured by the comprehension benchmark (§3).
 
-### 4.2 Primer küçük belgelerde kazancı siliyor
+### 4.2 The primer cancels the savings on small documents
 
-1 satırlık primer 70–73 token (bpp2'de `x?` / `x?=` ayrımını da anlattığı için bpp1'deki 60'tan
-uzun). config örneğinde primer'li .bpp (393) minified JSON'dan (365) daha pahalı. Markdown planında
-da Markdown'dan pahalı (§4.1). Büyük belgelerde etkisi %2–4.
+The 1-line primer is 70–73 tokens, longer than bpp1's 60 because it also explains `x?` / `x?=`.
+On the config example, .bpp with the primer (393) costs more than minified JSON (365). On the
+Markdown plan it also costs more than Markdown (§4.1). On large documents its effect is 2–4%.
 
-### 4.3 CSV'ye karşı fark küçük (o200k)
+### 4.3 Small margin over CSV (o200k)
 
-Düz tabloda .bpp CSV'den o200k'de yalnızca −%5.7 ucuz. claude2'de fark −%16.5. CSV'nin tip
-bilgisi yoktur ve iç içe veri taşıyamaz. Yine de tamamen düz tablo için kazanç tokenizer'a bağlı
-ve küçüktür.
+On a flat table .bpp is only 5.7% smaller than CSV on o200k; on claude2 the margin is 16.5%. CSV
+has no types and cannot hold nested data, but for purely flat tables the gain is small and
+depends on the tokenizer.
 
-## 5. SPEC revizyon önerileri
+## 5. Proposed SPEC revisions
 
-| # | öneri | gerekçe | durum |
+| # | proposal | reason | status |
 |---|---|---|---|
-| R1 | **Sık görülen opsiyonel sütun pozisyonel yazılsın**; eksik değer `-` (string `"-"` tırnaklanır). Başlıkta `x?` pozisyonel, `x?=` anahtarlı. Encoder sütun bazında `eksik·t(" -")` ile `mevcut·t(" x=")` maliyetini karşılaştırarak seçer. | §4.1: −%7.6 / −%6.1, Markdown'dan −%5.4 / −%5.7 ucuz | **uygulandı (`bpp2`)** |
-| R2 | Çok satırlı metin sütunları için **metin bloğu**: satırın altında, çocuk satırlardan ayırt edilebilir girintili satırlar | §4.1: ek −%1.8 | ölçüldü, uygulanmadı; çocuk satırlarla belirsizlik tasarımı gerekiyor |
-| R3 | Primer yalnızca belge büyükse eklensin (ör. `--primer auto`: gövde > 1000 token) | §4.2 | önerilir; anlama testi primer'in katkısını gösterirse eşik oradan seçilmeli |
-| R4 | Sözlük eşiği anlama testine göre ayarlanabilsin (`--refs min-gain=N`); doğruluk düşerse yalnızca çok tekrarlanan uzun değerlerde kullanılsın | §3 risk 1 | anlama testi sonrasına bağlı |
-| R5 | Liste öğelerindeki iç içe nesneler (orders'taki `customer`) satır tablosunda noktalı sütun (`customer.name`) olarak düzleştirilsin | orders hâlâ `- ` öğeleriyle yazılıyor | **ölçülmedi**; E2'de noktalı anahtarlar config için kötüydü (claude2 +%22), tablolarda ayrıca ölçülmeli |
+| R1 | **Write frequently present optional columns positionally**, with `-` when missing (the string `"-"` is quoted). Header: `x?` positional, `x?=` keyed. The encoder picks per column by comparing `missing·t(" -")` with `present·t(" x=")`. | §4.1: −7.6% / −6.1%; 5.4% / 5.7% smaller than Markdown | **implemented (`bpp2`)** |
+| R2 | A **text block** for multi-line text columns: indented lines under the row that can be told apart from child rows | §4.1: a further −1.8% | measured, not implemented; needs a design that avoids ambiguity with child rows |
+| R3 | Add the primer only to large documents (e.g. `--primer auto` when the body exceeds 1000 tokens) | §4.2 | recommended; if the comprehension benchmark shows the primer helps, pick the threshold from those results |
+| R4 | Make the dictionary threshold tunable after the comprehension benchmark (`--refs min-gain=N`); if accuracy drops, use it only for long values that repeat a lot | §3 risk 1 | depends on the comprehension results |
+| R5 | Flatten nested objects inside list items (`customer` in orders) into dotted columns (`customer.name`) in a row table | orders is still written as `- ` items | **not measured**; dotted keys were bad for the config in E2 (+22% on claude2), so tables need their own measurement |
 
-R1 `bpp2` olarak uygulandı. `bpp2` decoder'ı `bpp1` dosyalarını okumaya devam eder (SPEC §11).
-R2 bir sonraki sürüm (`bpp3`) için adaydır.
+R1 shipped as `bpp2`. The `bpp2` decoder still reads `bpp1` files (SPEC §11). R2 is a candidate
+for the next version (`bpp3`).

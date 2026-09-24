@@ -9,6 +9,7 @@ description = "A token-efficient text format for feeding structured data and pla
 readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "MIT" }
+authors = [{ name = "Furkan" }]
 dependencies = ["PyYAML>=5.4"]
 
 [project.optional-dependencies]

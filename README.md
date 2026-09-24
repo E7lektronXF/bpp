@@ -43,7 +43,7 @@ Token counts per format for six example files (o200k tokenizer; fewer is better)
 
 Anthropic's published Claude tokenizer (`claude2`) shows the same picture: −59% vs JSON, −30% vs
 TOON. The full tables, the method and the cases where bpp wins by less are in
-[BENCHMARK.md](BENCHMARK.md) (in Turkish).
+[BENCHMARK.md](BENCHMARK.md).
 
 ## Quick start
 
@@ -177,7 +177,7 @@ steps[5]{status? note?= title}>steps
   done Pazarlama analitiği
 ```
 
-The full grammar and the measurement behind each rule are in [SPEC.md](SPEC.md) (in Turkish).
+The full grammar and the measurement behind each rule are in [SPEC.md](SPEC.md).
 
 ## Why it is smaller
 
@@ -272,3 +272,7 @@ examples/      sample inputs next to their .bpp output
 bench/         experiments, token benchmark, comprehension benchmark
 tests/         pytest + hypothesis
 ```
+
+## License
+
+[MIT](LICENSE)

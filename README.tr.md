@@ -4,7 +4,7 @@
 
 `.bpp`, JSON/YAML/CSV verisini ve Markdown planlarını bir LLM'in **daha az token ile** okuyacağı
 bir metne çevirir, sonra kayıpsız geri çevirir. Örnek setlerde toplam token sayısı JSON'a göre
-**~%59**, TOON'a göre **~%30** daha az ([BENCHMARK.md](BENCHMARK.md)).
+**~%59**, TOON'a göre **~%30** daha az ([BENCHMARK.tr.md](BENCHMARK.tr.md)).
 
 Bir benzetmeyle: bpp, veriyi LLM'e göndermeden önce vakumlu paketlemek gibidir. İçerik aynı
 kalır, kapladığı yer (token) küçülür, açınca her şey eskisi gibi çıkar.
@@ -243,7 +243,7 @@ Kurallar kısaca:
 * `"..."` → JSON string (yalnızca gerektiğinde tırnak). `[a,b]` → liste.
 * `&0 uzun metin` bir kez tanımlanır, sonra `*0` diye kullanılır.
 
-Tam tanım: [SPEC.md](SPEC.md). `examples/` klasöründe her örneğin kaynak dosyası ve `.bpp`
+Tam tanım: [SPEC.tr.md](SPEC.tr.md). `examples/` klasöründe her örneğin kaynak dosyası ve `.bpp`
 karşılığı yan yana duruyor.
 
 ## Primer satırı
@@ -270,7 +270,7 @@ bakın.
 | tekrarlı loglar | 5629 | 4109 | 3348 | **1857** | −%42 (CSV) |
 
 o200k token'ı. claude2 tokenizer'ı ile sonuçlar aynı yönde. Ayrıntılar, anlama testi ve
-kaybedilen durumların analizi için [BENCHMARK.md](BENCHMARK.md). **Not:** anlama/doğruluk testi
+kaybedilen durumların analizi için [BENCHMARK.tr.md](BENCHMARK.tr.md). **Not:** anlama/doğruluk testi
 yazıldı ama API anahtarı olmadığı için henüz çalıştırılmadı (`python bench/run_qa.py`).
 
 ## Kurulum seçenekleri (geliştiriciler için)
@@ -340,10 +340,14 @@ python bench/experiments.py    # SPEC'teki tasarım deneyleri
 ```
 
 ```
-SPEC.md          format spesifikasyonu ve her kararın ölçümü
-BENCHMARK.md     token sonuçları, anlama testi, kayıplar ve revizyon önerileri
+SPEC.tr.md       format spesifikasyonu ve her kararın ölçümü
+BENCHMARK.tr.md  token sonuçları, anlama testi, kayıplar ve revizyon önerileri
 src/bpp/         encoder, decoder, dönüştürücüler, CLI
 examples/        örnek girdiler ve .bpp karşılıkları
 bench/           deneyler, benchmark ve anlama testi betikleri
 tests/           pytest + hypothesis
 ```
+
+## Lisans
+
+[MIT](LICENSE)
