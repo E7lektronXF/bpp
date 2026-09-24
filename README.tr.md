@@ -1,4 +1,4 @@
-# bpp — LLM'e veri verirken daha az token
+# bpp — LLM'e veri verirken daha az token için yeni seçenecek
 
 🇬🇧 English: [README.md](README.md)
 
