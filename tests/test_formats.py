@@ -104,6 +104,13 @@ def test_csv_employees_byte_identical(tmp_path):
     assert dump_csv(via_bpp(load_csv(text), keep_order=True)) == text
 
 
+def test_csv_rejects_nul_on_every_python():
+    with pytest.raises(ValueError, match="NUL"):
+        load_csv("a\nx\x00y\n")
+    with pytest.raises(ValueError, match="NUL"):
+        dump_csv([{"a": "x\x00y"}])
+
+
 def test_csv_rejects_bad_input():
     with pytest.raises(ValueError, match="duplicate"):
         load_csv("a,a\n1,2\n")

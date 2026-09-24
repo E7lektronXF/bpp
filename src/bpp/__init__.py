@@ -32,4 +32,5 @@ def dump(data, path, **options):
     from .formats import detect, dumps as _dumps
 
     fmt = detect(path) if Path(path).suffix else "bpp"
-    Path(path).write_text(_dumps(data, fmt, **options), encoding="utf-8", newline="\n")
+    with open(path, "w", encoding="utf-8", newline="\n") as f:  # newline=: Python 3.9
+        f.write(_dumps(data, fmt, **options))

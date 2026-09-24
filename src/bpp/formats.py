@@ -115,7 +115,15 @@ def _cell_text(v) -> str:
     raise ValueError("CSV cells must be scalars")
 
 
+def _no_nul(text: str):
+    # Python < 3.11's csv module cannot read or write NUL; reject it everywhere
+    # so behaviour does not depend on the Python version.
+    if "\x00" in text:
+        raise ValueError("CSV cells cannot contain NUL (\\x00) characters")
+
+
 def load_csv(text: str) -> list[dict]:
+    _no_nul(text)
     rows = list(csv.reader(io.StringIO(text, newline="")))
     if not rows:
         return []
@@ -138,6 +146,11 @@ def dump_csv(data) -> str:
         for k in r:
             if k not in cols:
                 cols.append(k)
+    _no_nul("".join(cols))
+    for r in data:
+        for v in r.values():
+            if isinstance(v, str):
+                _no_nul(v)
     buf = io.StringIO()
     w = csv.writer(buf, lineterminator="\n")
     w.writerow(cols)

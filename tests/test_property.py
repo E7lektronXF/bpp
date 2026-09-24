@@ -73,7 +73,7 @@ def test_floats_including_nan_inf(xs):
                                                        and math.copysign(1, a) == math.copysign(1, b))
 
 
-CELL = (st.text(st.characters(codec="utf-8", exclude_categories=("Cs",), exclude_characters="\r"),
+CELL = (st.text(st.characters(codec="utf-8", exclude_categories=("Cs",), exclude_characters="\r\x00"),
                 max_size=10)
         | st.sampled_from(["", "0", "007", "-0", "1.50", "1e5", "true", "TRUE", "null", "3.25",
                            "12345678901234567890", "a,b", 'q"q', "x\ny", " s "]))
@@ -82,7 +82,7 @@ CELL = (st.text(st.characters(codec="utf-8", exclude_categories=("Cs",), exclude
 @SETTINGS
 @given(st.integers(1, 5).flatmap(lambda n: st.tuples(
     st.lists(st.text(st.characters(codec="utf-8", exclude_categories=("Cs",),
-                                   exclude_characters="\r"), min_size=1, max_size=8),
+                                   exclude_characters="\r\x00"), min_size=1, max_size=8),
              min_size=n, max_size=n, unique=True),
     st.lists(st.lists(CELL, min_size=n, max_size=n), min_size=1, max_size=6))))
 def test_csv_cells_roundtrip(t):

@@ -15,13 +15,16 @@ def run(*args):
     return main([str(a) for a in args])
 
 
+def _write(path, text):
+    path.write_bytes(text.encode("utf-8"))  # LF endings on every OS
+
+
 @pytest.fixture
 def files(tmp_path):
-    (tmp_path / "c.json").write_text(json.dumps(ds.config(), ensure_ascii=False, indent=2) + "\n",
-                                     encoding="utf-8")
-    (tmp_path / "e.csv").write_text(dump_csv(ds.employees()), encoding="utf-8")
-    (tmp_path / "p.md").write_text("# Plan\n\n## Adım 1\n- [x] a\n- [ ] b\n", encoding="utf-8")
-    (tmp_path / "y.yaml").write_text("a: 1\nb: [x, y]\nd: 2026-01-01\n", encoding="utf-8")
+    _write(tmp_path / "c.json", json.dumps(ds.config(), ensure_ascii=False, indent=2) + "\n")
+    _write(tmp_path / "e.csv", dump_csv(ds.employees()))
+    _write(tmp_path / "p.md", "# Plan\n\n## Adım 1\n- [x] a\n- [ ] b\n")
+    _write(tmp_path / "y.yaml", "a: 1\nb: [x, y]\nd: 2026-01-01\n")
     return tmp_path
 
 

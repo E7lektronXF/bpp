@@ -23,7 +23,8 @@ def _write(path: str | None, text: str):
     if not path or path == "-":
         sys.stdout.write(text)
     else:
-        Path(path).write_text(text, encoding="utf-8", newline="\n")
+        with open(path, "w", encoding="utf-8", newline="\n") as f:
+            f.write(text)
 
 
 def _load(path: str, fmt: str | None):
