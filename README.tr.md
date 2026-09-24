@@ -2,6 +2,8 @@
 
 🇬🇧 English: [README.md](README.md)
 
+**▶ [Tarayıcıda deneyin](https://e7lektronxf.github.io/bpp/):** kurulum olmadan kendi verinizi yapıştırıp token sayılarını karşılaştırın.
+
 `.bpp`, JSON/YAML/CSV verisini ve Markdown planlarını bir LLM'in **daha az token ile** okuyacağı
 bir metne çevirir, sonra kayıpsız geri çevirir. Örnek setlerde toplam token sayısı JSON'a göre
 **~%59**, TOON'a göre **~%30** daha az ([BENCHMARK.tr.md](BENCHMARK.tr.md)).

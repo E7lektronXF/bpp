@@ -1,0 +1,16 @@
+{
+  "name": "bpp-format",
+  "version": "0.2.0",
+  "description": "Token-efficient text format for feeding JSON, CSV and Markdown plans to LLMs. JavaScript port of the bpp encoder/decoder.",
+  "type": "module",
+  "main": "./bpp.js",
+  "exports": { ".": "./bpp.js" },
+  "files": ["bpp.js", "README.md"],
+  "keywords": ["llm", "tokens", "json", "toon", "prompt", "serialization"],
+  "license": "MIT",
+  "author": "Furkan",
+  "repository": { "type": "git", "url": "git+https://github.com/E7lektronXF/bpp.git", "directory": "js" },
+  "homepage": "https://github.com/E7lektronXF/bpp",
+  "engines": { "node": ">=18" },
+  "scripts": { "test": "cd .. && python -m pytest -q tests/test_js_parity.py" }
+}

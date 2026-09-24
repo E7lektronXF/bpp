@@ -13,6 +13,9 @@ language models read with far fewer tokens. You can convert it back without losi
   TypeScript.
 * **One command, one dependency.** `pip install`, then `bpp data.json`.
 
+**▶ [Try it in your browser](https://e7lektronxf.github.io/bpp/):** paste your own data and compare
+token counts, with no install needed.
+
 🇹🇷 Türkçe: [README.tr.md](https://github.com/E7lektronXF/bpp/blob/main/README.tr.md)
 
 ```
@@ -266,6 +269,8 @@ The TOON column needs Node.js and `cd bench/toon && npm install`.
 
 ```
 SPEC.md        format specification and the measurement behind every rule
+js/            JavaScript port (byte-identical output, tested against Python)
+site/          browser playground source; `python site/build.py` writes docs/index.html
 BENCHMARK.md   token results, comprehension test, losses and proposed revisions
 src/bpp/       encoder, decoder, converters, CLI
 examples/      sample inputs next to their .bpp output

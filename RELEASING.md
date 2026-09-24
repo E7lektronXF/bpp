@@ -35,3 +35,15 @@ python -m build
 python -m twine check dist/*
 python -m twine upload dist/*      # asks for a PyPI API token
 ```
+
+## Playground (GitHub Pages)
+
+The browser playground is `docs/index.html`, built from `site/playground.html` and `js/bpp.js`:
+
+```bash
+python site/build.py
+```
+
+One-time setup: **Settings → Pages → Build and deployment → Deploy from a branch**, branch
+`main`, folder `/docs`. The page is then served at https://e7lektronxf.github.io/bpp/.
+Rebuild and commit `docs/index.html` whenever `js/bpp.js`, the examples or the template change.

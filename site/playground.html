@@ -1,0 +1,379 @@
+<!--HEAD-->
+<title>bpp playground</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+:root {
+  --paper: #f5f7f3;
+  --surface: #ffffff;
+  --ink: #15201b;
+  --muted: #5a6660;
+  --rule: #d9dfda;
+  --accent: #3446d8;
+  --accent-soft: #e5e8ff;
+  --bar: #c9d0cb;
+  --ok: #1d7a4e;
+  --bad: #b3261e;
+  --code-bg: #fbfcfa;
+  --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --sans: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --paper: #0f1412; --surface: #151c19; --ink: #e3e9e5; --muted: #95a39c; --rule: #28322e;
+    --accent: #8f9cff; --accent-soft: #232a4f; --bar: #3a4541; --ok: #5cc590; --bad: #ff8a80; --code-bg: #121815;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --paper: #0f1412; --surface: #151c19; --ink: #e3e9e5; --muted: #95a39c; --rule: #28322e;
+  --accent: #8f9cff; --accent-soft: #232a4f; --bar: #3a4541; --ok: #5cc590; --bad: #ff8a80; --code-bg: #121815;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font: 15px/1.55 var(--sans);
+  padding-inline: 20px;
+  padding-block: 28px 48px;
+}
+.wrap { max-width: 1180px; margin: 0 auto; display: grid; grid-template-columns: minmax(0, 1fr); gap: 28px; }
+.wrap > * { min-width: 0; }
+a { color: var(--accent); }
+header { display: flex; flex-wrap: wrap; gap: 12px 28px; align-items: end; justify-content: space-between; }
+h1 { font: 800 clamp(34px, 5vw, 52px)/1 var(--display); letter-spacing: -0.02em; margin: 0; }
+h1 span { color: var(--accent); }
+.tagline { margin: 6px 0 0; color: var(--muted); max-width: 52ch; text-wrap: balance; }
+.links { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; min-width: 0; max-width: 100%; }
+header > div { min-width: 0; }
+.install {
+  display: inline-flex; align-items: center; gap: 8px; font: 500 13px var(--mono);
+  background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; padding: 6px 6px 6px 12px;
+  max-width: 100%; overflow-x: auto;
+}
+.install code { white-space: nowrap; }
+button, select, .filebtn {
+  font: 500 13px var(--sans); color: var(--ink); background: var(--surface);
+  border: 1px solid var(--rule); border-radius: 7px; padding: 6px 11px; cursor: pointer;
+}
+button:hover, select:hover, .filebtn:hover { border-color: var(--muted); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.ghost { background: transparent; }
+
+.headline {
+  display: grid; grid-template-columns: auto 1fr; gap: 6px 22px; align-items: center;
+  padding-block: 4px;
+}
+.big { font: 800 clamp(48px, 9vw, 96px)/0.9 var(--display); letter-spacing: -0.03em; color: var(--accent);
+  font-variant-numeric: tabular-nums; }
+.big-sub { color: var(--muted); }
+.big-sub strong { color: var(--ink); font-weight: 600; }
+
+.controls { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; }
+.seg { display: inline-flex; border: 1px solid var(--rule); border-radius: 8px; overflow: hidden; background: var(--surface); }
+.seg button { border: 0; border-radius: 0; background: transparent; padding: 6px 12px; }
+.seg button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.check { display: inline-flex; gap: 6px; align-items: center; color: var(--muted); font-size: 13px; }
+.check input { accent-color: var(--accent); }
+.filebtn input { display: none; }
+
+.panes { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 820px) { .panes { grid-template-columns: 1fr; } .headline { grid-template-columns: 1fr; } }
+.pane { display: grid; grid-template-rows: auto 1fr; min-width: 0; }
+.pane-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 0 2px 8px; }
+.pane-title { font: 600 12px var(--sans); text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+.pane-title b { color: var(--ink); letter-spacing: 0.02em; text-transform: none; font: 500 13px var(--mono); margin-left: 6px; }
+textarea, pre.out {
+  width: 100%; height: 440px; margin: 0; resize: vertical; overflow: auto;
+  font: 13px/1.55 var(--mono); color: var(--ink); background: var(--code-bg);
+  border: 1px solid var(--rule); border-radius: 10px; padding: 14px 16px; tab-size: 2;
+}
+pre.out { white-space: pre; }
+pre.out.error { color: var(--bad); white-space: pre-wrap; }
+.pane.bpp pre.out { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.status { font: 500 12px var(--sans); padding: 3px 9px; border-radius: 999px; border: 1px solid currentColor; white-space: nowrap; }
+.status.ok { color: var(--ok); }
+.status.bad { color: var(--bad); }
+
+.compare { display: grid; gap: 10px; }
+.compare-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 16px; align-items: baseline; }
+h2 { font: 600 20px var(--display); margin: 0; }
+.note { color: var(--muted); font-size: 13px; }
+.bars { display: grid; gap: 7px; }
+.bar { display: grid; grid-template-columns: 150px 1fr 150px; gap: 12px; align-items: center; font-size: 14px; }
+.bar .label { color: var(--muted); }
+.bar .track { display: block; height: 14px; border-radius: 4px; background: transparent; }
+.bar .fill { display: block; height: 100%; border-radius: 4px; background: var(--bar); min-width: 2px; transition: width 0.35s ease; }
+.bar .num { font: 500 13px var(--mono); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+.bar .num em { font-style: normal; color: var(--muted); margin-left: 8px; }
+.bar.me .label { color: var(--accent); font-weight: 600; }
+.bar.me .fill { background: var(--accent); }
+@media (max-width: 560px) { .bar { grid-template-columns: 96px 1fr; } .bar .num { grid-column: 2; text-align: left; } }
+
+.cheats { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px 28px; border-top: 1px solid var(--rule); padding-top: 22px; }
+.cheats div { display: grid; gap: 4px; }
+.cheats code { font: 500 13px var(--mono); color: var(--accent); }
+.cheats .k { color: var(--muted); }
+.cheats p code { font-size: 12.5px; }
+.cheats p { margin: 0; color: var(--muted); font-size: 14px; }
+footer { color: var(--muted); font-size: 13px; }
+@media (prefers-reduced-motion: reduce) { .bar .fill { transition: none; } }
+</style>
+<!--/HEAD-->
+<!--BODY-->
+<div class="wrap">
+  <header>
+    <div>
+      <h1>bpp <span>playground</span></h1>
+      <p class="tagline">Paste JSON, YAML, CSV or a Markdown plan and see it as bpp, the text format that gives LLMs the same data in fewer tokens. Everything runs in your browser.</p>
+    </div>
+    <div class="links">
+      <span class="install"><code>pip install https://github.com/E7lektronXF/bpp/archive/HEAD.zip</code><button id="copy-install" class="ghost" type="button">Copy</button></span>
+      <a href="https://github.com/E7lektronXF/bpp">GitHub</a>
+      <a href="https://github.com/E7lektronXF/bpp/blob/main/SPEC.md">Spec</a>
+      <a href="https://github.com/E7lektronXF/bpp/blob/main/BENCHMARK.md">Benchmark</a>
+    </div>
+  </header>
+
+  <section class="headline" aria-live="polite">
+    <div class="big" id="big">−57%</div>
+    <div class="big-sub" id="big-sub">tokens compared with pretty-printed JSON.</div>
+  </section>
+
+  <section class="controls" aria-label="Input settings">
+    <label class="check" for="example">Example
+      <select id="example"></select>
+    </label>
+    <div class="seg" role="group" aria-label="Input format" id="formats">
+      <button type="button" data-fmt="json">JSON</button>
+      <button type="button" data-fmt="yaml">YAML</button>
+      <button type="button" data-fmt="csv">CSV</button>
+      <button type="button" data-fmt="md">Markdown</button>
+    </div>
+    <label class="filebtn">Open file…<input type="file" id="file" accept=".json,.yaml,.yml,.csv,.md,.markdown,.txt"></label>
+    <label class="check"><input type="checkbox" id="opt-primer"> Primer line</label>
+    <label class="check"><input type="checkbox" id="opt-refs" checked> Dictionary (&amp;n / *n)</label>
+    <label class="check"><input type="checkbox" id="opt-order"> Keep key order</label>
+  </section>
+
+  <section class="panes">
+    <div class="pane">
+      <div class="pane-head"><span class="pane-title">Input <b id="in-count"></b></span></div>
+      <textarea id="input" spellcheck="false" aria-label="Input data"></textarea>
+    </div>
+    <div class="pane bpp">
+      <div class="pane-head">
+        <span class="pane-title">bpp <b id="out-count"></b></span>
+        <span style="display:flex;gap:8px;align-items:center">
+          <span class="status" id="roundtrip" hidden></span>
+          <button type="button" id="copy-out">Copy</button>
+        </span>
+      </div>
+      <pre class="out" id="output" tabindex="0" aria-label="bpp output"></pre>
+    </div>
+  </section>
+
+  <section class="compare">
+    <div class="compare-head">
+      <h2>Tokens per format</h2>
+      <span class="note" id="tok-note">Counting with an estimate while the tokenizer loads…</span>
+    </div>
+    <div class="bars" id="bars"></div>
+  </section>
+
+  <section class="cheats" aria-label="How to read bpp">
+    <div><span class="k"><code>key value</code></span><p>One entry per line. A key on its own line opens a nested object; one space of indentation per level.</p></div>
+    <div><span class="k"><code>rows[3]{id name note?= title}</code></span><p>A table: 3 rows follow, values in column order. The last column is the rest of the line.</p></div>
+    <div><span class="k"><code>status?</code> · <code>note?=</code></span><p>Optional columns: <code>status?</code> sits in place (<code>-</code> when absent); <code>note?=</code> appears only when present, as <code>note=…</code>.</p></div>
+    <div><span class="k"><code>&amp;0 long text</code> · <code>*0</code></span><p>A long value that repeats is written once and referenced, like YAML anchors.</p></div>
+  </section>
+
+  <footer>bpp is MIT licensed. The command-line tool and Python package are the reference implementation; this page runs the JavaScript port, which is tested to produce identical output.</footer>
+</div>
+
+<script type="application/json" id="examples">/*EXAMPLES*/</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js"></script>
+<script type="module">
+/*BPP_JS*/
+
+// ------------------------------------------------------------- page logic
+const TIKTOKEN = 'https://cdn.jsdelivr.net/npm/js-tiktoken@1.0.21/lite/+esm';
+const O200K = 'https://cdn.jsdelivr.net/npm/js-tiktoken@1.0.21/ranks/o200k_base/+esm';
+const TOON = 'https://cdn.jsdelivr.net/npm/@toon-format/toon@4.1.1/+esm';
+const EXAMPLES = JSON.parse(document.getElementById('examples').textContent);
+const $ = (id) => document.getElementById(id);
+const els = { input: $('input'), output: $('output'), bars: $('bars'), big: $('big'), bigSub: $('big-sub'),
+  note: $('tok-note'), rt: $('roundtrip'), inCount: $('in-count'), outCount: $('out-count'), example: $('example') };
+const state = { fmt: 'json', counter: { name: 'estimate', count: estTokens, exact: false }, toon: null };
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch { /* storage unavailable */ } },
+};
+
+for (const [i, ex] of EXAMPLES.entries()) {
+  const o = document.createElement('option');
+  o.value = String(i);
+  o.textContent = ex.label;
+  els.example.append(o);
+}
+const custom = document.createElement('option');
+custom.value = 'custom';
+custom.textContent = 'Your data';
+els.example.append(custom);
+
+function setFormat(fmt) {
+  state.fmt = fmt;
+  for (const b of document.querySelectorAll('#formats button')) b.setAttribute('aria-pressed', String(b.dataset.fmt === fmt));
+}
+
+function loadExample(i) {
+  const ex = EXAMPLES[i];
+  els.input.value = ex.text;
+  els.example.value = String(i);
+  setFormat(ex.fmt);
+  render();
+}
+
+function parseInput(text, fmt) {
+  if (fmt === 'json') return parseJSON(text);
+  if (fmt === 'csv') return loadCSV(text);
+  if (fmt === 'md') return mdToTree(text);
+  if (!window.jsyaml) throw new Error('YAML input needs the js-yaml library, which could not be loaded. Try JSON instead.');
+  return toModel(window.jsyaml.load(text, { schema: window.jsyaml.CORE_SCHEMA }) ?? null);
+}
+
+function canon(v, ordered) {
+  const sort = (x) => {
+    if (x instanceof Map) {
+      const keys = [...x.keys()];
+      if (!ordered) keys.sort();
+      return new Map(keys.map((k) => [k, sort(x.get(k))]));
+    }
+    return Array.isArray(x) ? x.map(sort) : x;
+  };
+  return stringifyJSON(sort(v), null);
+}
+
+const pct = (a, b) => `${a <= b ? '−' : '+'}${Math.abs(Math.round(100 * (a - b) / b))}%`;
+
+function render() {
+  const text = els.input.value;
+  store.set('bpp-playground', JSON.stringify({ text, fmt: state.fmt }));
+  const keepOrder = $('opt-order').checked || state.fmt === 'csv';
+  let model;
+  try {
+    model = parseInput(text, state.fmt);
+  } catch (e) {
+    els.output.textContent = `Could not read the input as ${state.fmt.toUpperCase()}:\n${e.message}`;
+    els.output.classList.add('error');
+    els.rt.hidden = true;
+    els.bars.replaceChildren();
+    els.big.textContent = '—';
+    els.bigSub.textContent = 'Fix the input to see the comparison.';
+    return;
+  }
+  els.output.classList.remove('error');
+  const out = encode(model, { primer: $('opt-primer').checked, refs: $('opt-refs').checked, keepOrder });
+  els.output.textContent = out;
+
+  let same = false;
+  try { same = canon(decode(out), keepOrder) === canon(model, keepOrder); } catch { same = false; }
+  els.rt.hidden = false;
+  els.rt.className = 'status ' + (same ? 'ok' : 'bad');
+  els.rt.textContent = same ? 'Decodes back identically' : 'Round trip mismatch';
+
+  const plain = () => toPlain(model);
+  const rows = [['JSON', stringifyJSON(model, 2)], ['JSON (minified)', stringifyJSON(model, null)]];
+  if (window.jsyaml) { try { rows.push(['YAML', window.jsyaml.dump(plain(), { lineWidth: -1 })]); } catch { /* skip */ } }
+  const csv = dumpCSV(model);
+  if (csv !== null) rows.push(['CSV', csv]);
+  if (state.fmt === 'md') rows.push(['Markdown (input)', text]);
+  if (state.toon) { try { rows.push(['TOON', state.toon.encode(plain())]); } catch { /* skip */ } }
+  rows.push(['bpp', out]);
+
+  const count = state.counter.count;
+  const counted = rows.map(([name, t]) => [name, count(t)]);
+  const json = counted[0][1];
+  const mine = counted[counted.length - 1][1];
+  const others = counted.slice(0, -1);
+  const best = others.reduce((a, b) => (b[1] < a[1] ? b : a));
+  const max = Math.max(...counted.map((r) => r[1]), 1);
+  const approx = state.counter.exact ? '' : '≈';
+
+  els.big.textContent = pct(mine, json);
+  els.bigSub.innerHTML = '';
+  els.bigSub.append(`tokens compared with pretty-printed JSON (${approx}${json} → ${approx}${mine}). `,
+    Object.assign(document.createElement('strong'), { textContent: `${pct(mine, best[1])} vs ${best[0]}` }),
+    ', the smallest of the other formats.');
+  els.inCount.textContent = `${approx}${count(text)} tokens`;
+  els.outCount.textContent = `${approx}${mine} tokens`;
+
+  els.bars.replaceChildren(...counted.map(([name, n]) => {
+    const row = document.createElement('div');
+    row.className = 'bar' + (name === 'bpp' ? ' me' : '');
+    row.innerHTML = '<span class="label"></span><span class="track"><span class="fill"></span></span><span class="num"></span>';
+    row.querySelector('.label').textContent = name;
+    row.querySelector('.fill').style.width = `${(100 * n) / max}%`;
+    const num = row.querySelector('.num');
+    num.textContent = `${approx}${n.toLocaleString('en-US')}`;
+    const em = document.createElement('em');
+    em.textContent = name === 'JSON' ? 'baseline' : pct(n, json);
+    num.append(em);
+    return row;
+  }));
+}
+
+let timer = null;
+els.input.addEventListener('input', () => {
+  els.example.value = 'custom';
+  clearTimeout(timer);
+  timer = setTimeout(render, 200);
+});
+els.example.addEventListener('change', () => { if (els.example.value !== 'custom') loadExample(Number(els.example.value)); });
+for (const b of document.querySelectorAll('#formats button')) b.addEventListener('click', () => { setFormat(b.dataset.fmt); render(); });
+for (const id of ['opt-primer', 'opt-refs', 'opt-order']) $(id).addEventListener('change', render);
+$('file').addEventListener('change', (e) => {
+  const f = e.target.files[0];
+  if (!f) return;
+  const ext = f.name.split('.').pop().toLowerCase();
+  const fmt = { json: 'json', yaml: 'yaml', yml: 'yaml', csv: 'csv', md: 'md', markdown: 'md' }[ext] || state.fmt;
+  const r = new FileReader();
+  r.onload = () => { els.input.value = String(r.result); els.example.value = 'custom'; setFormat(fmt); render(); };
+  r.readAsText(f);
+});
+function copy(text, btn, target) {
+  const done = () => { const t = btn.textContent; btn.textContent = 'Copied'; setTimeout(() => { btn.textContent = t; }, 1200); };
+  const select = () => {
+    const range = document.createRange();
+    range.selectNodeContents(target);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+  };
+  try { navigator.clipboard.writeText(text).then(done, select); } catch { select(); }
+}
+$('copy-out').addEventListener('click', (e) => copy(els.output.textContent, e.currentTarget, els.output));
+$('copy-install').addEventListener('click', (e) => {
+  const code = document.querySelector('.install code');
+  copy(code.textContent, e.currentTarget, code);
+});
+
+// Start with the saved input or the first example, then upgrade the counter.
+const saved = (() => { try { return JSON.parse(store.get('bpp-playground') || 'null'); } catch { return null; } })();
+if (saved && saved.text) { els.input.value = saved.text; els.example.value = 'custom'; setFormat(saved.fmt || 'json'); render(); }
+else loadExample(0);
+
+Promise.all([import(TIKTOKEN), import(O200K)]).then(([lite, ranks]) => {
+  const enc = new lite.Tiktoken(ranks.default);
+  state.counter = { name: 'o200k_base', count: (s) => enc.encode(s, [], []).length, exact: true };
+  els.note.textContent = 'Exact counts with o200k_base, the GPT-4o tokenizer. Claude uses its own tokenizer; relative differences are similar.';
+  render();
+}).catch(() => {
+  els.note.textContent = 'The tokenizer could not be loaded, so counts are estimates (≈).';
+});
+import(TOON).then((m) => { state.toon = m; render(); }).catch(() => { /* TOON row stays hidden */ });
+</script>
+<!--/BODY-->
