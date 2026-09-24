@@ -139,8 +139,8 @@ bpp                159     74       83           -57.2%             -55.4%
 bpp + primer       377    144      157           -16.8%             -15.6%
 ```
 
-`o200k` ve `claude2` sütunları için `pip install tiktoken` gerekir; kurulu değilse kaba bir tahmin
-(`chars/4`) gösterilir. Bu kadar küçük bir dosyada primer satırı kazancın çoğunu yer; primer'i
+`o200k` ve `claude2` sütunları için `pip install tiktoken` gerekir; kurulu değilse yaklaşık bir tahmin
+(`estimate`) gösterilir. Bu kadar küçük bir dosyada primer satırı kazancın çoğunu yer; primer'i
 büyük dosyalarda kullanın.
 
 ### Python kodundan kullanın

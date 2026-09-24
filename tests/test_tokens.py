@@ -21,7 +21,7 @@ def test_fallback_when_nothing_available(monkeypatch):
     monkeypatch.setattr(tokens, "_o200k", boom)
     monkeypatch.setattr(tokens, "_claude2", boom)
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
-    assert list(tokens.available_counters()) == ["chars/4"]
+    assert list(tokens.available_counters()) == ["estimate"]
 
 
 def test_expand_js_tiktoken_ranks():

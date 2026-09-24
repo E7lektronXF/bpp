@@ -176,6 +176,10 @@ def available_counters() -> dict[str, Callable[[str], int]]:
         except Exception:
             pass
     if not out:
-        # Last resort so `bpp stats` still prints something useful.
-        out["chars/4"] = lambda s: (len(s) + 3) // 4
+        # Last resort so `bpp stats` still prints something useful: the
+        # encoder's own estimator (ranks formats like the real tokenizers do;
+        # a plain chars/4 gets the direction wrong for Turkish text).
+        from .estimate import est_tokens
+
+        out["estimate"] = est_tokens
     return out
