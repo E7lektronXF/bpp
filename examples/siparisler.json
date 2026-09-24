@@ -1,0 +1,8 @@
+{
+  "magaza": "Kadıköy Şubesi",
+  "siparisler": [
+    {"no": 1, "musteri": "Ayşe Yılmaz", "urun": "Kulaklık", "adet": 2, "fiyat": 749.9},
+    {"no": 2, "musteri": "Can Demir", "urun": "Klavye", "adet": 1, "fiyat": 1299.0},
+    {"no": 3, "musteri": "Şule Öztürk", "urun": "Kulaklık", "adet": 1, "fiyat": 749.9}
+  ]
+}

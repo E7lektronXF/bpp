@@ -116,7 +116,10 @@ def cmd_stats(a) -> int:
         w = [max(len(r[i]) for r in table) for i in range(len(head))]
         for r in table:
             print("  ".join(c.ljust(w[i]) if i == 0 else c.rjust(w[i]) for i, c in enumerate(r)))
-    if "anthropic" not in counters:
+    if "chars/4" in counters:
+        print("\nnote: chars/4 is a rough estimate; pip install tiktoken for real token counts.",
+              file=sys.stderr)
+    elif "anthropic" not in counters:
         print("\nnote: o200k/claude2 are proxies; set ANTHROPIC_API_KEY for real Claude counts.",
               file=sys.stderr)
     return 0
@@ -131,10 +134,13 @@ def _savings(src: str, out: str) -> str:
         name, fn = next(iter(available_counters().items()))
     except Exception:
         return ""
-    if name == "chars/4":
-        return ""
     a, b = fn(src), fn(out)
-    return f" ({name}: {a} -> {b} tokens, {100 * (b - a) / a:+.0f}%)" if a else ""
+    if not a:
+        return ""
+    if name == "chars/4":
+        return (f" (~{a} -> ~{b} tokens, {100 * (b - a) / a:+.0f}%, rough estimate; "
+                "pip install tiktoken for exact counts)")
+    return f" ({name}: {a} -> {b} tokens, {100 * (b - a) / a:+.0f}%)"
 
 
 def cmd_auto(a) -> int:
