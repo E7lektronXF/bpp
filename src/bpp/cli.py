@@ -176,7 +176,17 @@ def _auto_main(argv: list[str]) -> int:
         return 1
 
 
+def _utf8_console():
+    # Windows consoles default to a legacy code page; Turkish text would crash print().
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8")
+        except (AttributeError, ValueError):
+            pass
+
+
 def main(argv: list[str] | None = None) -> int:
+    _utf8_console()
     argv = sys.argv[1:] if argv is None else argv
     if argv and argv[0] not in ("encode", "decode", "stats", "-h", "--help", "--version"):
         return _auto_main(argv)
