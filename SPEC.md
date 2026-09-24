@@ -116,7 +116,7 @@ codes ["01","02"]
 Öğeler `,` ile ayrılır, boşluk yok. `,` veya `]` içeren ya da §2.1'e takılan öğe tırnaklanır.
 **Ölçüm (E9):** `[a,b]`, TOON'un `k[2]: a,b` biçiminden −%1.5/−%0.9 ucuz.
 
-### 4.2 Tablo: tekdüze nesne dizileri — `key[N]{a,b,c}`
+### 4.2 Virgüllü tablo: tekdüze nesne dizileri — `key[N]{a,b,c}`
 
 Tüm öğeleri **aynı anahtarları aynı sırada** taşıyan ve değerleri skaler olan nesne dizileri:
 
@@ -142,11 +142,20 @@ taşımaz). Varyantlar arasındaki farklar küçük: tab ayraç o200k'de −%0.8
 `|` +%4; satır girintisi +%2.8; `[N]` kaldırmak −%0.1 (anlamaya yardımı için **korunur**);
 null'u boş hücre yazmak −%0.1/−%0.2 (netlik için **`null` korunur**).
 
-### 4.3 Satır tablosu (outline): metin ağırlıklı / seyrek / özyinelemeli diziler —
+> **Aşama 2 revizyonu:** gerçek encoder ile yapılan ölçümde aynı tablo §4.3'teki **boşluklu
+> satır tablosu** olarak yazıldığında virgüllü tablodan belirgin ucuz çıktı: 60×10 çalışan
+> tablosunda 2171→1910 (o200k, −%12) ve 2511→1961 (claude2, −%22). Neden: `,` çoğu zaman ayrı
+> token'dır ve arkasındaki kelime/sayıyla kaynaşmaz; boşluk ise bir sonraki token'ın içine girer
+> (§3'teki `key value` bulgusunun aynısı). Bu yüzden encoder her dizi için adayları (virgüllü
+> tablo, satır tablosu, `- ` listesi) üretir ve deterministik token tahmincisine göre en ucuzunu
+> seçer; eşitlikte sırayı koruyan aday kazanır. Virgüllü tablo; değerlerin çoğunda boşluk olduğu
+> durumlar için geçerli kalır.
+
+### 4.3 Satır tablosu: boşlukla ayrılmış satırlar, seyrek ve özyinelemeli diziler —
 `key[N]{a b? c}>child`
 
-Başlıktaki sütun adları **boşlukla** ayrılmışsa satırlar boşlukla ayrılır. Planlar, görev
-listeleri ve ağaçlar için tasarlandı:
+Başlıktaki sütun adları **boşlukla** ayrılmışsa satırlar boşlukla ayrılır. Önce planlar ve
+ağaçlar için tasarlandı; ölçümler düz tablolarda da en ucuz form olduğunu gösterdi (§4.2 notu):
 
 ```
 steps[2]{id:str status priority deps:str owner? note? title}>steps
@@ -167,8 +176,13 @@ steps[2]{id:str status priority deps:str owner? note? title}>steps
   satırlar o öğenin `child` dizisidir. Çocuk dizisi boşsa `child=[]` yazılır; anahtar yoksa hiçbir
   şey yazılmaz. `[N]` yalnızca en üst seviyedeki satırları sayar.
 * Son sütunun değeri `ad=` kalıbıyla başlıyorsa tırnaklanır.
-* Decode edilen nesnede anahtar sırası başlık sırasıdır (encoder başlığı ilk görülen anahtar
-  sırasıyla kurar, yalnızca "satır sonu" sütununu sona taşır).
+* Başlık sırası = satırdaki değer sırası = decode edilen nesnedeki anahtar sırası. (LLM'in
+  sütunları doğru eşlemesi için başlık ile satır sırası asla ayrışmaz.)
+* Encoder iki varyant dener: (a) sırayı koruyan — son sütun orijinal son anahtar; (b) en çok
+  boşluk içeren metin sütununu (ör. `title`, `name`) sona taşıyan — bu durumda o sütundaki
+  değerler tırnaksız yazılır ama nesnenin anahtar sırası değişir. (b) yalnızca daha ucuzsa ve
+  `keep_order` kapalıysa seçilir. **CSV girdisinde `keep_order` her zaman açıktır** (sütun sırası
+  veridir).
 
 **Ölçüm (E4, E8, E8b; 6 adım + 21 alt adım):**
 
@@ -297,7 +311,9 @@ yapılacak.
 `decode(encode(x)) == x`, JSON veri modeli üzerinde:
 
 * tipler korunur (int/float, string/sayı, null);
-* nesne anahtar sırası korunur (istisna: satır tablolarında §4.3'teki kanonik sıra);
+* nesne anahtar sırası korunur; tek istisna §4.3(b) (bir metin sütunu satır sonuna taşınır).
+  `encode(..., keep_order=True)` / `bpp encode --keep-order` bunu da kapatır ve JSON metni
+  anahtar sırasıyla birlikte birebir geri gelir;
 * YAML: yorumlar, anchor'lar, etiketler veri modeline ait değildir, korunmaz. Tarih/saat
   değerleri string olarak okunur (otomatik `date` dönüşümü kapatılır). String olmayan YAML
   anahtarları string'e çevrilir.

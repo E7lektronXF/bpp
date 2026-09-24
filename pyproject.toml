@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bpp"
+version = "0.1.0"
+description = "A token-efficient text format for feeding structured data and plans to LLMs, with a lossless JSON/YAML/CSV converter."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+dependencies = ["PyYAML>=5.4"]
+
+[project.optional-dependencies]
+stats = ["tiktoken>=0.7"]
+api = ["anthropic>=0.40"]
+dev = ["pytest>=7", "hypothesis>=6", "tiktoken>=0.7"]
+
+[project.scripts]
+bpp = "bpp.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
