@@ -29,7 +29,18 @@ def _yaml_loader():
     import yaml
 
     class Loader(yaml.SafeLoader):
-        pass
+        def construct_mapping(self, node, deep=False):
+            # Stringify keys before they meet in a dict: YAML `1:` and `true:`
+            # are different keys but equal (and same-hash) in Python.
+            if not isinstance(node, yaml.MappingNode):
+                raise yaml.constructor.ConstructorError(
+                    None, None, "expected a mapping", node.start_mark)
+            self.flatten_mapping(node)
+            out = {}
+            for key_node, value_node in node.value:
+                key = _key_str(self.construct_object(key_node, deep=deep))
+                out[key] = self.construct_object(value_node, deep=deep)
+            return out
 
     # Keep dates/times as the strings they were written as: JSON has no date
     # type, and turning them into datetime objects would not round-trip.
@@ -40,15 +51,20 @@ def _yaml_loader():
     return Loader
 
 
-def _json_keys(v):
+def _key_str(k) -> str:
     """YAML allows non-string keys; the JSON data model does not."""
+    if isinstance(k, str):
+        return k
+    if isinstance(k, (bool, int, float)) or k is None:
+        return json.dumps(k)
+    if isinstance(k, (list, tuple, dict)):
+        raise ValueError("YAML keys must be scalars")
+    return str(k)
+
+
+def _json_keys(v):
     if isinstance(v, dict):
-        out = {}
-        for k, x in v.items():
-            if not isinstance(k, str):
-                k = json.dumps(k) if isinstance(k, (bool, int, float)) or k is None else str(k)
-            out[k] = _json_keys(x)
-        return out
+        return {_key_str(k): _json_keys(x) for k, x in v.items()}
     if isinstance(v, list):
         return [_json_keys(x) for x in v]
     if isinstance(v, (str, int, float, bool)) or v is None:

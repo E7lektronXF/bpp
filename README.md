@@ -117,6 +117,19 @@ o200k ve claude2 güncel Claude modelleri için yalnızca vekildir; formatlar ar
 fark için kullanılır. TOON karşılaştırması için `bench/toon/` içinde `npm install` çalıştırılmış
 olmalıdır (referans `@toon-format/toon` uygulaması Node ile çağrılır).
 
+## Testler
+
+```bash
+pip install -e ".[dev]"
+pytest -q
+```
+
+200 test: SPEC örneklerinin birebir çıktısı, uç durumlar (boş dizi/nesne, 80 seviye iç içe yapı,
+ayraç/tırnak/ters bölü içeren string'ler, çok satırlı metin, Türkçe ve diğer Unicode karakterler,
+null, sayıya benzeyen string'ler, `1` / `1.0`), hatalı girdilerde satır numaralı hata mesajları,
+JSON/YAML/CSV/Markdown dönüşümleri, CLI ve hypothesis ile rastgele JSON / CSV / YAML /
+Markdown ağaçları üzerinde round-trip özellikleri.
+
 ## Depo yapısı
 
 ```
@@ -125,4 +138,5 @@ src/bpp/              encoder, decoder, format dönüştürücüler, CLI, token 
 bench/experiments.py  tasarım deneyleri -> bench/results/experiments.md
 bench/datasets.py     deterministik örnek veriler
 bench/toon/           referans TOON uygulamasına köprü (yalnızca karşılaştırma için)
+tests/                pytest + hypothesis
 ```
