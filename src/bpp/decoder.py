@@ -20,27 +20,28 @@ def decode(text: str):
     """Decode .bpp text into Python/JSON values."""
     raw = text.split("\n")
     lines: list[_Line] = []
-    header_seen = False
+    version = 0
     for no, ln in enumerate(raw, 1):
         if ln.endswith("\r"):
             ln = ln[:-1]
         stripped = ln.lstrip(" ")
         if not stripped or stripped.startswith("#"):
             continue
-        if not header_seen:
-            if stripped != "bpp1":
-                raise BppError("missing 'bpp1' header", no)
-            header_seen = True
+        if not version:
+            if stripped not in ("bpp1", "bpp2"):
+                raise BppError("missing 'bpp2' header", no)
+            version = int(stripped[3])
             continue
         lines.append(_Line(len(ln) - len(stripped), stripped, no))
-    if not header_seen:
-        raise BppError("missing 'bpp1' header")
-    return _Dec(lines).document()
+    if not version:
+        raise BppError("missing 'bpp2' header")
+    return _Dec(lines, version).document()
 
 
 class _Dec:
-    def __init__(self, lines: list[_Line]):
+    def __init__(self, lines: list[_Line], version: int = 2):
         self.L = lines
+        self.version = version
         self.i = 0
         self.refs: list = []
 
@@ -177,14 +178,22 @@ class _Dec:
         while True:
             name = c.key()
             opt = False
+            keyed = False
             if c.peek() == "?":
                 opt = True
                 c.i += 1
+                # bpp2: `x?` = positional, '-' when absent; `x?=` = written as x=v.
+                # bpp1 only had the x=v form, spelled `x?`.
+                if self.version == 1:
+                    keyed = True
+                elif c.peek() == "=":
+                    keyed = True
+                    c.i += 1
             smode = False
             if c.s.startswith(":str", c.i):
                 smode = True
                 c.i += 4
-            out.append((name, opt, smode))
+            out.append((name, opt, keyed, smode))
             if c.eof():
                 break
             sep = c.peek()
@@ -207,7 +216,7 @@ class _Dec:
             self.i += 1
             c = self.cur(r)
             vals = []
-            for j, (_, _, smode) in enumerate(spec):
+            for j, (_, _, _, smode) in enumerate(spec):
                 vals.append(c.token(",", smode))
                 if j < len(spec) - 1:
                     c.expect(",")
@@ -218,18 +227,22 @@ class _Dec:
 
     def outline(self, n: int, spec, child, d: int, ln: _Line) -> list:
         order = [s[0] for s in spec]
-        smode = {s[0]: s[2] for s in spec}
+        smode = {s[0]: s[3] for s in spec}
         optional = {s[0] for s in spec if s[1]}
+        keyed = {s[0] for s in spec if s[2]}
         last = order[-1]
         if last in optional:
             raise BppError("last column must be required", ln.no)
-        positional = [c for c in order[:-1] if c not in optional]
-        kv_names = optional | ({child} if child else set())
+        positional = [c for c in order[:-1] if c not in keyed]
+        kv_names = keyed | ({child} if child else set())
 
         def row(r: _Line):
             c = self.cur(r)
             got = {}
             for name in positional:
+                if name in optional and c.s.startswith("- ", c.i):
+                    c.i += 2  # '-' = this optional column is absent
+                    continue
                 got[name] = self._cell(c, smode[name])
                 c.expect(" ")
             while True:

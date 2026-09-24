@@ -46,25 +46,25 @@ olmadığına işaret eder. `ANTHROPIC_API_KEY` tanımlıysa `run_tokens.py` ve 
 
 | örnek | JSON | JSON min | YAML | CSV | Markdown | TOON | **bpp** | bpp+primer | bpp vs en iyi rakip |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---|
-| employees | 5538 | 3562 | 4388 | 2165 | – | 2277 | **2042** | 2102 | **−5.7%** (CSV) |
-| config | 601 | 365 | 443 | – | – | 399 | **323** | 383 | **−11.5%** (JSON min) |
-| plan | 1609 | 990 | 1212 | – | – | 1228 | **634** | 694 | **−36.0%** (JSON min) |
-| project_plan | 1501 | 1025 | 1119 | – | 837 | 1093 | 857 | 917 | **+2.4%** (Markdown) ❌ |
-| orders | 3524 | 2231 | 2636 | – | – | 2276 | **1762** | 1822 | **−21.0%** (JSON min) |
-| logs | 5629 | 4109 | 4587 | 3185 | – | 3348 | **1857** | 1917 | **−41.7%** (CSV) |
-| **toplam** | 18402 | 12282 | 14385 | | | 10621 | **7475** | 7835 | JSON'a göre **−59.4%**, TOON'a göre **−29.6%** |
+| employees | 5538 | 3562 | 4388 | 2165 | – | 2277 | **2042** | 2112 | **-5.7%** (CSV) |
+| config | 601 | 365 | 443 | – | – | 399 | **323** | 393 | **-11.5%** (JSON min) |
+| plan | 1609 | 990 | 1212 | – | – | 1228 | **636** | 706 | **-35.8%** (JSON min) |
+| project_plan | 1501 | 1025 | 1119 | – | 837 | 1093 | **792** | 862 | **-5.4%** (Markdown) |
+| orders | 3524 | 2231 | 2636 | – | – | 2276 | **1762** | 1832 | **-21.0%** (JSON min) |
+| logs | 5629 | 4109 | 4587 | 3185 | – | 3348 | **1857** | 1927 | **-41.7%** (CSV) |
+| **toplam** | 18402 | 12282 | 14385 | | | 10621 | **7412** | 7832 | JSON'a göre **-59.7%**, TOON'a göre **-30.2%** |
 
 ### claude2
 
 | örnek | JSON | JSON min | YAML | CSV | Markdown | TOON | **bpp** | bpp+primer | bpp vs en iyi rakip |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---|
-| employees | 5669 | 3984 | 4072 | 2501 | – | 2496 | **2084** | 2148 | **−16.5%** (TOON) |
-| config | 611 | 393 | 417 | – | – | 389 | **332** | 396 | **−14.7%** (TOON) |
-| plan | 1719 | 1078 | 1248 | – | – | 1257 | **726** | 790 | **−32.7%** (JSON min) |
-| project_plan | 1737 | 1265 | 1288 | – | 1078 | 1273 | 1083 | 1147 | **+0.5%** (Markdown) ❌ |
-| orders | 3615 | 2455 | 2526 | – | – | 2342 | **1839** | 1903 | **−21.5%** (TOON) |
-| logs | 5563 | 4199 | 4456 | 3249 | – | 3332 | **1800** | 1864 | **−44.6%** (CSV) |
-| **toplam** | 18914 | 13374 | 14007 | | | 11089 | **7864** | 8248 | JSON'a göre **−58.4%**, TOON'a göre **−29.1%** |
+| employees | 5669 | 3984 | 4072 | 2501 | – | 2496 | **2084** | 2158 | **-16.5%** (TOON) |
+| config | 611 | 393 | 417 | – | – | 389 | **332** | 406 | **-14.7%** (TOON) |
+| plan | 1719 | 1078 | 1248 | – | – | 1257 | **728** | 802 | **-32.5%** (JSON min) |
+| project_plan | 1737 | 1265 | 1288 | – | 1078 | 1273 | **1017** | 1091 | **-5.7%** (Markdown) |
+| orders | 3615 | 2455 | 2526 | – | – | 2342 | **1839** | 1913 | **-21.5%** (TOON) |
+| logs | 5563 | 4199 | 4456 | 3249 | – | 3332 | **1800** | 1874 | **-44.6%** (CSV) |
+| **toplam** | 18914 | 13374 | 14007 | | | 11089 | **7800** | 8244 | JSON'a göre **-58.8%**, TOON'a göre **-29.7%** |
 
 Ayrıntılı tablolar (sözlüksüz `--no-refs` varyantı dahil): `bench/results/tokens.md`.
 
@@ -77,6 +77,7 @@ Ayrıntılı tablolar (sözlüksüz `--no-refs` varyantı dahil): `bench/results
 | `key value` (`:` yok), 1 boşluk girinti | config, orders | `key:value`'ya göre −%3…−%8 |
 | Sözlük (`&n` / `*n`) | logs, orders | logs'ta sözlüksüz haline göre −%36 / −%39; orders'ta −%4.5 / −%7.3 |
 | Ağaç satırları (`>steps`) | plan | JSON min'e göre −%36; iç içe nesneler yerine girintili satırlar |
+| Pozisyonel opsiyonel sütun (`status?`, eksikse `-`) — bpp2 | project_plan | bpp1'e göre −%7.6 / −%6.1; kaynak Markdown'ı geçmesini sağlayan değişiklik |
 | Minimum tırnak + ham UTF-8 | her yerde | `\u` escape'i Türkçe metinde +%124…+%161 token olurdu |
 
 **Sözlüğün payı:** logs örneğindeki büyük farkın çoğu sözlükten geliyor. Sözlük kapatıldığında
@@ -125,29 +126,59 @@ raporlanır.
 
 ## 4. Kaybedilen kategoriler ve nedenleri
 
-### 4.1 Markdown checklist planı: Markdown +%2.4 / +%0.5 daha ucuz
+### 4.1 Markdown checklist planı — `bpp1`'de kaybediyordu, `bpp2`'de çözüldü
+
+**bpp1'deki durum:** kaynak Markdown .bpp'den +%2.4 / +%0.5 daha ucuzdu (837'ye karşı 857 token).
 
 **Neden:** Plan satırlarının çoğunda `status` var ama hepsinde değil (başlıklar ve bazı maddeler
-checkbox'sız). Bu yüzden encoder `status`'u **opsiyonel** sütun yapıyor ve her satıra
-`status=done ` yazıyor (3–4 token). Markdown'da aynı bilgi `[x]` (1–2 token). İkinci, daha küçük
-etken: notlar `note="..."` olarak tırnaklanıp satır sonları `\n` ile escape ediliyor. Markdown'da
-aynı notlar girintili düz satırlar.
+checkbox'sız). Bu yüzden `status` opsiyonel sütundu ve her satıra `status=done ` yazılıyordu
+(3–4 token). Markdown'da aynı bilgi `[x]` (1–2 token). İkinci, daha küçük etken: notlar
+`note="..."` olarak tırnaklanıp satır sonları `\n` ile escape ediliyor. Markdown'da aynı notlar
+girintili düz satırlar.
 
 **Prototip ölçümü** (aynı veri, elle üretilmiş varyantlar):
 
 | varyant | o200k | claude2 |
 |---|---:|---:|
-| mevcut `.bpp` (`status=done`, `note="…"`) | 857 | 1083 |
+| bpp1 (`status=done`, `note="…"`) | 857 | 1083 |
 | status pozisyonel, eksik değer `-` | **786** | **1011** |
 | status checkbox `[x]` olarak | 827 | 1058 |
 | not metin bloğu (girintili satırlar) | 842 | 1064 |
 | checkbox + metin bloğu | 817 | 1044 |
 | Markdown (kaynak) | 837 | 1078 |
 
+**Çözüm — R1, `bpp2`'de uygulandı:** Çoğu satırda bulunan opsiyonel sütun artık pozisyonel
+yazılıyor; eksik değer `-` ile gösteriliyor ve başlıkta `status?` olarak işaretleniyor. Seyrek
+sütunlar `note?=` olarak `note=...` biçiminde kalıyor. Encoder seçimi sütun bazında maliyet
+karşılaştırmasıyla yapıyor.
+
+```
+steps[5]{status? note?= title}>steps
+- Keşif ve envanter
+ done note="Toplam 312 Airflow DAG'i, …" Mevcut iş akışlarının envanteri
+ done Veri sahipleriyle görüşmeler
+```
+
+| | o200k | claude2 |
+|---|---:|---:|
+| bpp1 | 857 | 1083 |
+| **bpp2** | **792** (−%7.6) | **1017** (−%6.1) |
+| Markdown (kaynak) | 837 | 1078 |
+| bpp2, Markdown'a göre | **−%5.4** | **−%5.7** |
+
+Prototipteki 786 ile gerçek encoder'ın 792'si arasındaki fark başlık gösteriminden geliyor
+(`status? note?=`). Bedeli: yalnızca anahtarlı opsiyonel sütun içeren tablolarda başlık sütun başına
+bir `=` uzuyor (`plan.json`: 634 → 636). Diğer örneklerde değişiklik yok.
+
+**Kalan açık:** primer eklenince .bpp bu örnekte yine Markdown'dan pahalı (862'ye karşı 837,
+claude2'de 1091'e karşı 1078). Markdown'u her LLM zaten tanır; .bpp'nin primer'siz anlaşılıp
+anlaşılmadığı anlama testiyle ölçülmeli (§3).
+
 ### 4.2 Primer küçük belgelerde kazancı siliyor
 
-1 satırlık primer 60–63 token. config örneğinde primer'li .bpp (383) minified JSON'dan (365) daha
-pahalı. Büyük belgelerde etkisi %2–3.
+1 satırlık primer 70–73 token (bpp2'de `x?` / `x?=` ayrımını da anlattığı için bpp1'deki 60'tan
+uzun). config örneğinde primer'li .bpp (393) minified JSON'dan (365) daha pahalı. Markdown planında
+da Markdown'dan pahalı (§4.1). Büyük belgelerde etkisi %2–4.
 
 ### 4.3 CSV'ye karşı fark küçük (o200k)
 
@@ -159,11 +190,11 @@ ve küçüktür.
 
 | # | öneri | gerekçe | durum |
 |---|---|---|---|
-| R1 | **Sık görülen opsiyonel sütun pozisyonel yazılsın**; eksik değer için ayrılmış bir işaret (`-`, string `"-"` tırnaklanır). Başlıkta ayrı bir gösterim gerekir (ör. `status?-`). Encoder sütun bazında `eksik·t("-")` ile `mevcut·t("status=")` maliyetini karşılaştırarak seçer. | §4.1: −%8.3 / −%6.6, Markdown'ı ~%6 geçiyor | ölçüldü, uygulanmadı |
+| R1 | **Sık görülen opsiyonel sütun pozisyonel yazılsın**; eksik değer `-` (string `"-"` tırnaklanır). Başlıkta `x?` pozisyonel, `x?=` anahtarlı. Encoder sütun bazında `eksik·t(" -")` ile `mevcut·t(" x=")` maliyetini karşılaştırarak seçer. | §4.1: −%7.6 / −%6.1, Markdown'dan −%5.4 / −%5.7 ucuz | **uygulandı (`bpp2`)** |
 | R2 | Çok satırlı metin sütunları için **metin bloğu**: satırın altında, çocuk satırlardan ayırt edilebilir girintili satırlar | §4.1: ek −%1.8 | ölçüldü, uygulanmadı; çocuk satırlarla belirsizlik tasarımı gerekiyor |
 | R3 | Primer yalnızca belge büyükse eklensin (ör. `--primer auto`: gövde > 1000 token) | §4.2 | önerilir; anlama testi primer'in katkısını gösterirse eşik oradan seçilmeli |
 | R4 | Sözlük eşiği anlama testine göre ayarlanabilsin (`--refs min-gain=N`); doğruluk düşerse yalnızca çok tekrarlanan uzun değerlerde kullanılsın | §3 risk 1 | anlama testi sonrasına bağlı |
 | R5 | Liste öğelerindeki iç içe nesneler (orders'taki `customer`) satır tablosunda noktalı sütun (`customer.name`) olarak düzleştirilsin | orders hâlâ `- ` öğeleriyle yazılıyor | **ölçülmedi**; E2'de noktalı anahtarlar config için kötüydü (claude2 +%22), tablolarda ayrıca ölçülmeli |
 
-R1 ve R2, SPEC'in `bpp2` sürümü için adaylardır. `bpp1` decoder'ı bu gösterimleri
-tanımayacağından başlık satırındaki sürüm değişmelidir.
+R1 `bpp2` olarak uygulandı. `bpp2` decoder'ı `bpp1` dosyalarını okumaya devam eder (SPEC §11).
+R2 bir sonraki sürüm (`bpp3`) için adaydır.

@@ -51,7 +51,7 @@ pip install tiktoken
 bpp --version
 ```
 
-Çıktı `bpp 0.1.0` olmalı. `bpp` komutu bulunamazsa aynı her şeyi `python -m bpp` ile
+Çıktı `bpp 0.2.0` olmalı. `bpp` komutu bulunamazsa aynı her şeyi `python -m bpp` ile
 çalıştırabilirsiniz (örneğin `python -m bpp --version`).
 
 ## Kullanım
@@ -93,7 +93,7 @@ Yanına `siparisler.bpp` oluşur. `.json`, `.yaml`, `.csv` ve `.md` dosyalarıyl
 `siparisler.bpp`:
 
 ```
-bpp1
+bpp2
 magaza Kadıköy Şubesi
 siparisler[3]{no urun adet fiyat musteri}
 1 Kulaklık 2 749.9 Ayşe Yılmaz
@@ -105,7 +105,7 @@ siparisler[3]{no urun adet fiyat musteri}
 
 `siparisler.bpp`'yi bir metin editöründe açın, içeriğini kopyalayıp ChatGPT, Claude vb. sohbet
 penceresine yapıştırın ve sorunuzu yazın. Model formatı ilk kez görecekse `--primer` ekleyin;
-dosyanın başına formatı anlatan tek bir açıklama satırı (~60 token) eklenir:
+dosyanın başına formatı anlatan tek bir açıklama satırı (~70 token) eklenir:
 
 ```bash
 bpp siparisler.json --primer
@@ -136,7 +136,7 @@ JSON (indent 2)    424    173      186            +0.0%              +0.0%
 JSON (minified)    261    109      129           -37.0%             -30.6%
 YAML               257    130      130           -24.9%             -30.1%
 bpp                159     74       83           -57.2%             -55.4%
-bpp + primer       345    134      147           -22.5%             -21.0%
+bpp + primer       377    144      157           -16.8%             -15.6%
 ```
 
 `o200k` ve `claude2` sütunları için `pip install tiktoken` gerekir; kurulu değilse kaba bir tahmin
@@ -191,7 +191,7 @@ Kaldırmak için: `pip uninstall bpp`.
 </td><td>
 
 ```
-bpp1
+bpp2
 server
  host 0.0.0.0
  port 8080
@@ -209,10 +209,10 @@ regions [TR,DE,NL]
 (Token sayıları `examples/config.yaml`'ın tamamı içindir. Yukarıdaki parça o dosyanın kısaltılmış
 halidir.)
 
-Bir plan (`examples/plan.json`, JSON'da 1609 token, .bpp'de 634):
+Bir plan (`examples/plan.json`, JSON'da 1609 token, .bpp'de 636):
 
 ```
-steps[6]{id:str status priority deps:str owner? note? title}>steps
+steps[6]{id:str status priority deps:str owner?= note?= title}>steps
 1 done P1 [] owner=Ayşe Gereksinim analizi
  1.1 done P1 [] Paydaş görüşmeleri
  1.2 done P0 [] Regülasyon incelemesi (BDDK, PCI-DSS)
@@ -220,12 +220,24 @@ steps[6]{id:str status priority deps:str owner? note? title}>steps
 2 done P1 [1] owner=Mehmet Mimari tasarım
 ```
 
+Bir Markdown checklist'i (`examples/project_plan.md`, Markdown'da 837 token, .bpp'de 792). Durumu
+olmayan satırlarda `-` yazılır:
+
+```
+steps[5]{status? note?= title}>steps
+- Keşif ve envanter
+ done note="Toplam 312 Airflow DAG'i, 48 Spark işi ve 17 Hive veritabanı tespit edildi." Mevcut iş akışlarının envanteri
+ done Veri sahipleriyle görüşmeler
+  done Pazarlama analitiği
+```
+
 Kurallar kısaca:
 
 * `anahtar değer` satırları; tek başına `anahtar` iç içe nesne açar (1 boşluk girinti).
 * `ad[N]{a b c}` → N satır, değerler sütun sırasıyla boşlukla ayrılmış, **son sütun satırın
-  geri kalanı**. `x?` opsiyonel sütun, satırda `x=değer` diye yazılır. `>steps` → girintili
-  satırlar üstteki satırın alt adımlarıdır.
+  geri kalanı**. `>steps` → girintili satırlar üstteki satırın alt adımlarıdır.
+* Opsiyonel sütunlar: `x?` yerinde yazılır, değer yoksa `-`; `x?=` yalnızca varsa `x=değer`
+  diye yazılır. (Encoder sık olanı `x?`, seyrek olanı `x?=` yapar.)
 * `"..."` → JSON string (yalnızca gerektiğinde tırnak). `[a,b]` → liste.
 * `&0 uzun metin` bir kez tanımlanır, sonra `*0` diye kullanılır.
 
@@ -238,10 +250,11 @@ Formatı hiç görmemiş bir model için `--primer` dosyanın başına şu `#` y
 (decoder yok sayar):
 
 ```
-# bpp1: JSON as 'key value' lines, 1-space indent nests. k[N]{a b}: N rows of values in column order, last column = rest of line, x? columns appear as x=v. "..." = JSON string, *n = &n.
+# bpp2: JSON as 'key value' lines, 1-space indent nests. k[N]{a b}: N rows of values in column order, last column = rest of line; x? = optional ('-' if absent), x?= columns appear as x=v. "..." = JSON string, *n = &n.
 ```
 
-Küçük belgelerde (birkaç yüz token) primer kazancı silebilir; BENCHMARK §4.2'ye bakın.
+Primer ~70 token tutar. Küçük belgelerde (birkaç yüz token) kazancı silebilir; BENCHMARK §4.2'ye
+bakın.
 
 ## Sonuçlar (özet)
 
@@ -249,8 +262,8 @@ Küçük belgelerde (birkaç yüz token) primer kazancı silebilir; BENCHMARK §
 |---|---:|---:|---:|---:|---|
 | 60×10 tablo (CSV) | 5538 | 3562 | 2277 | **2042** | −%6 (CSV) |
 | iç içe config (YAML) | 601 | 365 | 399 | **323** | −%12 (min. JSON) |
-| yapılandırılmış plan (JSON) | 1609 | 990 | 1228 | **634** | −%36 (min. JSON) |
-| Markdown plan | 1501 | 1025 | 1093 | 857 | **+%2 (Markdown kaybettirir)** |
+| yapılandırılmış plan (JSON) | 1609 | 990 | 1228 | **636** | −%36 (min. JSON) |
+| Markdown checklist planı | 1501 | 1025 | 1093 | **792** | −%5 (kaynak Markdown: 837) |
 | karışık API yanıtı | 3524 | 2231 | 2276 | **1762** | −%21 (min. JSON) |
 | tekrarlı loglar | 5629 | 4109 | 3348 | **1857** | −%42 (CSV) |
 
@@ -285,7 +298,7 @@ bpp stats data.json [--markdown]
 
 | seçenek | etkisi |
 |---|---|
-| `--primer` | Başa açıklama satırı ekler (`short` ~60, `long` ~110 token). |
+| `--primer` | Başa açıklama satırı ekler (`short` ~70, `long` ~115 token). |
 | `--no-refs` | `&n`/`*n` sözlüğünü kapatır. |
 | `--keep-order` | Anahtar sırasını hiç değiştirmez. Varsayılanda encoder, `title` gibi bir metin sütununu satır sonuna taşıyabilir (veri aynı, JSON'daki anahtar sırası farklı). CSV'de her zaman açık. |
 | `-f/--force` | Kısayol modunda var olan dosyanın üzerine yazar (varsayılan: yazmaz). |

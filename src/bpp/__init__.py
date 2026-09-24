@@ -13,7 +13,7 @@ from .decoder import decode
 from .encoder import encode
 from .lexer import BppError
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 __all__ = ["encode", "decode", "dumps", "loads", "load", "dump", "BppError", "__version__"]
 
 dumps = encode

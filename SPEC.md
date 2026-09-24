@@ -1,6 +1,6 @@
-# .bpp — Format Spesifikasyonu (sürüm `bpp1`)
+# .bpp — Format Spesifikasyonu (sürüm `bpp2`)
 
-> Durum: **v1** (`bpp1`). Her karar `bench/experiments.py` ile ölçüldü; ham sonuçlar
+> Durum: **v2** (`bpp2`; decoder `bpp1` dosyalarını da okur, bkz. §11). Her karar `bench/experiments.py` ile ölçüldü; ham sonuçlar
 > `bench/results/experiments.md`'de. Benchmark sonuçları ve `bpp2` için revizyon önerileri (R1–R5):
 > [BENCHMARK.md](BENCHMARK.md) §5.
 
@@ -30,7 +30,7 @@ daha fazla eksik saydığını belirtir); **formatlar arası göreli fark** esas
 ## 1. Dosya yapısı
 
 ```
-bpp1                      ← başlık satırı (zorunlu, sürüm)
+bpp2                      ← başlık satırı (zorunlu, sürüm)
 # ...                     ← 0+ yorum/primer satırı (opsiyonel)
 &0 uzun tekrarlanan değer ← 0+ sözlük tanımı (opsiyonel)
 ...gövde...               ← kök değer
@@ -153,24 +153,32 @@ null'u boş hücre yazmak −%0.1/−%0.2 (netlik için **`null` korunur**).
 > durumlar için geçerli kalır.
 
 ### 4.3 Satır tablosu: boşlukla ayrılmış satırlar, seyrek ve özyinelemeli diziler —
-`key[N]{a b? c}>child`
+`key[N]{a b? c?= d}>child`
 
 Başlıktaki sütun adları **boşlukla** ayrılmışsa satırlar boşlukla ayrılır. Önce planlar ve
 ağaçlar için tasarlandı; ölçümler düz tablolarda da en ucuz form olduğunu gösterdi (§4.2 notu):
 
 ```
-steps[2]{id:str status priority deps:str owner? note? title}>steps
+steps[2]{id:str status? priority deps:str owner?= note?= title}>steps
 1 done P1 [] owner=Ayşe Gereksinim analizi
  1.1 done P1 [] Paydaş görüşmeleri
- 1.2 done P0 [1.1] Regülasyon incelemesi (BDDK, PCI-DSS)
+ 1.2 - P0 [1.1] Regülasyon incelemesi (BDDK, PCI-DSS)
 2 todo P0 [1] owner="Harici firma" note="Gece 02:00'de çalışır" Güvenlik testi
 ```
 
 * Zorunlu sütunlar pozisyoneldir (tek boşlukla ayrılır). **Son sütun satırın geri kalanıdır**
   (boşluk içerebilir, tırnak gerekmez).
-* `ad?` ile işaretli sütun opsiyoneldir: satırda yoksa o nesnede anahtar yoktur; varsa
-  pozisyonel sütunlardan sonra, son sütundan önce `ad=değer` olarak yazılır. (TypeScript'teki
-  `ad?:` gösterimi.) `ad?:str` birlikte kullanılabilir.
+* Opsiyonel sütunlar (TypeScript'teki `ad?:` gösterimi) iki biçimde yazılır. Satırda
+  olmayan bir opsiyonel sütun, o nesnede anahtarın **olmadığı** anlamına gelir (`null` değil):
+  * `ad?` — **pozisyonel opsiyonel**: yerinde değer ya da yoksa tek başına `-` yazılır. Değeri
+    string `"-"` olan hücre tırnaklanır.
+  * `ad?=` — **anahtarlı opsiyonel**: yalnızca varsa, pozisyonel sütunlardan sonra ve son
+    sütundan önce `ad=değer` olarak yazılır.
+
+  Encoder her opsiyonel sütun için `eksik·t(" -")` ile `mevcut·t(" ad=")` maliyetini
+  karşılaştırır: çoğu satırda bulunan sütun (ör. plan `status`'u) pozisyonel, seyrek sütun (ör.
+  `note`, `owner`) anahtarlı olur. `:str` her iki biçimle birlikte kullanılabilir
+  (`ad?:str`, `ad?=:str`).
 * Pozisyonel ve `ad=` değerleri boşluk içeriyorsa tırnaklanır. Hücreler skaler veya satır içi
   liste (`[a,b]`, `{}`) olabilir.
 * `>child`: özyineleme anahtarı. Bir satırın hemen altındaki **bir boşluk daha girintili**
@@ -247,7 +255,7 @@ Kök nesne ise girdileri 0 girintide yazılır. Kök dizi anahtarsız başlıkla
 YAML anchor/alias gösterimi (LLM'in tanıdığı kalıp):
 
 ```
-bpp1
+bpp2
 &0 Connection to upstream payment provider timed out after 30000ms
 &1 payments-gateway-eu-west-1
 logs[80]{ts,level,service,message,latency_ms}
@@ -274,7 +282,7 @@ uyarsa aynı şekilde kodlanır):
 ```
 title <plan başlığı>
 goal <opsiyonel açıklama>
-steps[N]{id:str status priority deps:str owner? due? note? title}>steps
+steps[N]{id:str status priority deps:str owner?= due?= note?= title}>steps
 ```
 
 * `id`: hiyerarşik kimlik (`1`, `1.2`, `1.2.3`); `:str` sayesinde tırnaksız.
@@ -284,28 +292,36 @@ steps[N]{id:str status priority deps:str owner? due? note? title}>steps
 * Alt adımlar `>steps` ile girintili satırlardır.
 
 Markdown girişinde: başlıklar (`#`, `##`, …) ve iç içe listeler ağaca çevrilir; `- [ ]` →
-`status todo`, `- [x]` → `status done`. (Ayrıntı Aşama 2'de README'de.)
+`status todo`, `- [x]` → `status done`, `[/]` → `doing`, `[-]` → `cancelled`. Checkbox'sız
+başlık ve maddelerde `status` yoktur; satırda `-` görünür:
+
+```
+steps[5]{status? note?= title}>steps
+- Keşif ve envanter
+ done note="Toplam 312 Airflow DAG'i ..." Mevcut iş akışlarının envanteri
+ doing Bağımlılık grafiğinin çıkarılması
+```
 
 ## 8. Primer (opsiyonel)
 
 Formatı hiç görmemiş bir LLM için dosyanın başına `#` yorum satırı olarak eklenebilir
 (`bpp encode --primer`). Decoder yok sayar.
 
-**1 satır (o200k 60 / claude2 63 token):**
+**1 satır (o200k 70 / claude2 73 token):**
 ```
-# bpp1: JSON as 'key value' lines, 1-space indent nests. k[N]{a b}: N rows of values in column order, last column = rest of line, x? columns appear as x=v. "..." = JSON string, *n = &n.
+# bpp2: JSON as 'key value' lines, 1-space indent nests. k[N]{a b}: N rows of values in column order, last column = rest of line; x? = optional ('-' if absent), x?= columns appear as x=v. "..." = JSON string, *n = &n.
 ```
 
-**3 satır (107 / 115 token):**
+**3 satır (115 / 123 token):**
 ```
-# bpp1 = JSON data. Lines are 'key value'; a bare 'key' opens a nested object (1-space indent). [a,b] = list.
+# bpp2 = JSON data. Lines are 'key value'; a bare 'key' opens a nested object (1-space indent). [a,b] = list.
 # k[N]{a b c}: N rows, values space-separated in column order, last column = rest of line;
-# x? = optional, written x=v; >kids: indented rows are kids. {a,b}: comma rows. k[N]: N '- ' items. "..." = JSON string. *n = &n value.
+# x? = optional, '-' if absent; x?= written as x=v; >kids: indented rows are kids. {a,b}: comma rows. k[N]: N '- ' items. "..." = JSON string. *n = &n value.
 ```
 
 > Aşama 4 revizyonu: Aşama 1'deki primer "k[N]{a,b} = N CSV rows" diyordu; Aşama 2'de satır
 > tablosu varsayılan olunca primer gerçek sözdizimini anlatacak şekilde yeniden yazıldı
-> (38 → 60 token).
+> (38 → 60 token). `bpp2` ile `x?` / `x?=` ayrımı eklendi (60 → 70 token).
 
 Primer sabit maliyettir: 60 satırlık tabloda (~2050 token) %2–3, küçük bir config'te (~330 token)
 %12–35. Varsayılan **kapalı**; Aşama 4'te anlama testinin primer'li/primer'siz karşılaştırması
@@ -328,7 +344,7 @@ yapılacak.
 ## 10. Gramer (özet, EBNF benzeri)
 
 ```
-file      = "bpp1" NL {comment} {def} body
+file      = "bpp2" NL {comment} {def} body
 comment   = INDENT "#" {any} NL
 def       = "&" digits SP scalar NL
 body      = object(0) | rootarray | scalar NL
@@ -339,8 +355,21 @@ entry(d)  = I(d) key SP inline NL                          (* skaler / [..] / {}
           | I(d) key "[" N "]" "{" cols(" ") "}" [">" key] NL rowtree(d)
           | I(d) key "[" N "]" NL N×item(d)
 item(d)   = I(d) "- " (inline | entry-tail) NL [object(d+1)]
-col       = key ["?"] [":str"]                             (* ? yalnızca boşluklu başlıkta *)
+col       = key ["?" ["="]] [":str"]                       (* ? ve ?= yalnızca boşluklu başlıkta *)
 inline    = scalar | "[" [scalar {"," scalar}] "]" | "{}"
 scalar    = "null" | "true" | "false" | number | jsonstring | "*" digits | barestring
 I(d)      = d × " "
 ```
+
+## 11. Sürüm geçmişi
+
+* **bpp2** — Pozisyonel opsiyonel sütun (`ad?`, eksikse `-`) eklendi; bpp1'deki `ad?` (anahtarlı)
+  gösterimi `ad?=` oldu. Gerekçe: Markdown checklist planında .bpp kaynak Markdown'a kaybediyordu,
+  çünkü çoğu satırda bulunan `status` her satırda `status=` diye tekrar ediliyordu. Ölçüm
+  (`examples/project_plan.md`): 857 → 792 token (o200k, −%7.6), 1083 → 1017 (claude2, −%6.1);
+  kaynak Markdown 837 / 1078 token, yani .bpp artık Markdown'dan −%5.4 / −%5.7 ucuz. Bedeli: yalnızca
+  anahtarlı opsiyonel sütun içeren tablolarda başlık sütun başına 1 karakter uzar (`plan.json`:
+  +2 token).
+* **bpp1** — İlk sürüm. Decoder `bpp1` başlıklı dosyaları okumaya devam eder; bu dosyalarda `ad?`
+  anahtarlı opsiyonel anlamına gelir.
+

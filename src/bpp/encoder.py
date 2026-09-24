@@ -7,15 +7,15 @@ from collections import Counter
 from .estimate import est_tokens
 from .lexer import NUM_RE, Ref, fmt_inline, fmt_key, fmt_scalar, is_scalar, jstr
 
-HEADER = "bpp1"
-PRIMER = ("# bpp1: JSON as 'key value' lines, 1-space indent nests. k[N]{a b}: N rows of values "
-          "in column order, last column = rest of line, x? columns appear as x=v. "
-          "\"...\" = JSON string, *n = &n.")
+HEADER = "bpp2"
+PRIMER = ("# bpp2: JSON as 'key value' lines, 1-space indent nests. k[N]{a b}: N rows of values "
+          "in column order, last column = rest of line; x? = optional ('-' if absent), "
+          "x?= columns appear as x=v. \"...\" = JSON string, *n = &n.")
 PRIMER_LONG = (
-    "# bpp1 = JSON data. Lines are 'key value'; a bare 'key' opens a nested object (1-space indent). [a,b] = list.\n"
+    "# bpp2 = JSON data. Lines are 'key value'; a bare 'key' opens a nested object (1-space indent). [a,b] = list.\n"
     "# k[N]{a b c}: N rows, values space-separated in column order, last column = rest of line;\n"
-    "# x? = optional, written x=v; >kids: indented rows are kids. {a,b}: comma rows. k[N]: N '- ' items. "
-    "\"...\" = JSON string. *n = &n value."
+    "# x? = optional, '-' if absent; x?= written as x=v; >kids: indented rows are kids. {a,b}: comma rows. "
+    "k[N]: N '- ' items. \"...\" = JSON string. *n = &n value."
 )
 CHILD_KEYS = ("steps", "children", "subtasks", "tasks", "items", "nodes")
 MIN_REF_LEN = 8
@@ -214,17 +214,24 @@ class _Enc:
         order = [c for c in cols if c != rest] + [rest]
         smode = {c: _str_col(x[c] for x in nodes if c in x) for c in order}
         optional = {c for c in order if c not in required}
-        head = " ".join(fmt_key(c) + ("?" if c in optional else "") + (":str" if smode[c] else "")
-                        for c in order)
+        # An optional column is positional with '-' for "absent" when that is
+        # cheaper than writing `name=` on every row that has it (SPEC §4.3).
+        keyed = set()
+        for c in optional:
+            present = sum(c in x for x in nodes)
+            if (len(nodes) - present) * est_tokens(" -") >= present * est_tokens(f" {fmt_key(c)}="):
+                keyed.add(c)
+        head = " ".join(fmt_key(c) + ("?=" if c in keyed else "?" if c in optional else "")
+                        + (":str" if smode[c] else "") for c in order)
         lines = [f"{' ' * d}{key}[{len(arr)}]{{{head}}}" + (f">{fmt_key(child)}" if child else "")]
 
         def row(x, depth):
             parts = []
             for c in order[:-1]:
-                if c in required:
-                    parts.append(self._cell(x[c], "pos", smode[c]))
+                if c not in keyed:
+                    parts.append(self._cell(x[c], "pos", smode[c]) if c in x else "-")
             for c in order[:-1]:
-                if c in optional and c in x:
+                if c in keyed and c in x:
                     parts.append(f"{fmt_key(c)}={self._cell(x[c], 'pos', smode[c])}")
             if child and child in x and not x[child]:
                 parts.append(f"{fmt_key(child)}=[]")

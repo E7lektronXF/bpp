@@ -64,7 +64,7 @@ def needs_quote(s: str, ctx: str = "value", strmode: bool = False) -> bool:
     if ctx == "list":
         return "," in s or "]" in s
     if ctx == "pos":
-        return " " in s
+        return " " in s or s == "-"
     if ctx == "item":
         return " " in s or "[" in s or "{" in s
     if ctx == "last":

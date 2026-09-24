@@ -27,7 +27,7 @@ def files(tmp_path):
 
 def test_json_roundtrip(files):
     assert run("encode", files / "c.json", "-o", files / "c.bpp", "--keep-order") == 0
-    assert (files / "c.bpp").read_text(encoding="utf-8").startswith("bpp1\n")
+    assert (files / "c.bpp").read_text(encoding="utf-8").startswith("bpp2\n")
     assert run("decode", files / "c.bpp", "-o", files / "c2.json") == 0
     assert (files / "c2.json").read_text(encoding="utf-8") == (files / "c.json").read_text(encoding="utf-8")
 
@@ -50,7 +50,7 @@ def test_yaml_and_md(files, capsys):
 
 def test_primer_and_minified(files, capsys):
     run("encode", files / "c.json", "--primer", "short")
-    assert capsys.readouterr().out.split("\n")[1].startswith("# bpp1")
+    assert capsys.readouterr().out.split("\n")[1].startswith("# bpp2")
     run("encode", files / "c.json", "-o", files / "c.bpp")
     run("decode", files / "c.bpp", "--indent", "-1")
     assert json.loads(capsys.readouterr().out) == ds.config()
@@ -93,7 +93,7 @@ def test_one_step_mode(files, capsys):
     assert run(files / "e.csv") == 0 and run(files / "e.bpp", "-o", "-", "--to", "csv") == 0
     assert capsys.readouterr().out == (files / "e.csv").read_text(encoding="utf-8")
     assert run(files / "p.md", "-o", "-", "--primer") == 0
-    assert capsys.readouterr().out.startswith("bpp1\n# bpp1:")
+    assert capsys.readouterr().out.startswith("bpp2\n# bpp2:")
 
 
 def test_python_api(files):
