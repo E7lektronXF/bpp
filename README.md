@@ -1,194 +1,133 @@
-# bpp — LLM'e veri verirken daha az token
+# bpp — give LLMs your data in ~60% fewer tokens
 
-`.bpp`, JSON/YAML/CSV verisini ve Markdown planlarını bir LLM'in **daha az token ile** okuyacağı
-bir metne çevirir, sonra kayıpsız geri çevirir. Örnek setlerde toplam token sayısı JSON'a göre
-**~%59**, TOON'a göre **~%30** daha az ([BENCHMARK.md](BENCHMARK.md)).
+**bpp** converts JSON, YAML, CSV and Markdown plans into `.bpp`, a compact text format that
+language models read with far fewer tokens. You can convert it back without losing anything.
 
-Bir benzetmeyle: bpp, veriyi LLM'e göndermeden önce vakumlu paketlemek gibidir. İçerik aynı
-kalır, kapladığı yer (token) küçülür, açınca her şey eskisi gibi çıkar.
+* **~60% fewer tokens than pretty JSON, ~30% fewer than [TOON](https://github.com/toon-format/toon)**
+  across the benchmark set. The format beats minified JSON, YAML, CSV and even raw Markdown on
+  every example.
+* **Lossless round trip:** `decode(encode(x)) == x` for JSON and YAML, with types preserved.
+  CSV cells come back byte for byte. Markdown plans keep their structure.
+* **Measured, not invented.** Every syntax choice was benchmarked on two tokenizers. There are no
+  made-up symbols or binary tricks, only patterns models already know from YAML, CSV, JSON and
+  TypeScript.
+* **One command, one dependency.** `pip install`, then `bpp data.json`.
 
-## Kurulum (5 dakika)
+🇹🇷 Türkçe: [README.tr.md](README.tr.md)
 
-### 1. Python var mı?
+```
+JSON, pretty-printed (146 tokens)                  bpp (53 tokens)
 
-Bir terminal açın:
-
-* **Windows:** Başlat menüsüne `PowerShell` yazıp açın.
-* **macOS:** Spotlight'a (⌘ + Boşluk) `Terminal` yazıp açın.
-* **Linux:** Terminal uygulamasını açın.
-
-Şunu yazın:
-
-```bash
-python --version        # Windows'ta çalışmazsa:  py --version
+{                                                  bpp2
+  "store": "Downtown Branch",                      store Downtown Branch
+  "orders": [                                      orders[3]{id product qty price customer}
+    {"id": 1, "customer": "Alice Johnson",         1 Headphones 2 79.9 Alice Johnson
+     "product": "Headphones", "qty": 2,            2 Keyboard 1 129.0 Bob Smith
+     "price": 79.9},                               3 Headphones 1 79.9 Carol White
+    ...
 ```
 
-`Python 3.9` veya daha yeni bir sürüm görüyorsanız 2. adıma geçin. Görmüyorsanız
-[python.org/downloads](https://www.python.org/downloads/) adresinden Python'u kurun. **Windows'ta
-kurulumun ilk ekranında "Add python.exe to PATH" kutusunu işaretleyin.** Sonra terminali kapatıp
-yeniden açın.
+## Results
 
-### 2. bpp'yi kurun (tek komut)
+Token counts per format for six example files (o200k tokenizer; fewer is better):
+
+| data | JSON | minified JSON | YAML | TOON | Markdown | **bpp** | bpp vs best alternative |
+|---|---:|---:|---:|---:|---:|---:|---|
+| 60×10 table (CSV) | 5538 | 3562 | 4388 | 2277 | – | **2042** | −6% vs CSV |
+| nested config (YAML) | 601 | 365 | 443 | 399 | – | **323** | −12% vs minified JSON |
+| project plan with deps (JSON) | 1609 | 990 | 1212 | 1228 | – | **636** | −36% vs minified JSON |
+| Markdown checklist plan | 1501 | 1025 | 1119 | 1093 | 837 | **792** | −5% vs Markdown |
+| mixed API response | 3524 | 2231 | 2636 | 2276 | – | **1762** | −21% vs minified JSON |
+| repetitive logs | 5629 | 4109 | 4587 | 3348 | – | **1857** | −42% vs CSV |
+| **total** | 18402 | 12282 | 14385 | 10621 | | **7412** | **−60% vs JSON, −30% vs TOON** |
+
+Anthropic's published Claude tokenizer (`claude2`) shows the same picture: −59% vs JSON, −30% vs
+TOON. The full tables, the method and the cases where bpp wins by less are in
+[BENCHMARK.md](BENCHMARK.md) (in Turkish).
+
+## Quick start
+
+### 1. Install
+
+You need Python 3.9 or newer (check with `python --version`). Then run:
 
 ```bash
 pip install https://github.com/E7lektronXF/bpp/archive/HEAD.zip
 ```
 
-Bu komut kodu GitHub'dan indirip kurar; git gerekmez. Windows'ta `pip` bulunamazsa
-`py -m pip install ...`, macOS/Linux'ta `python3 -m pip install ...` yazın.
+This installs straight from GitHub. You don't need git. If `pip` isn't found, use `python3 -m pip`
+on macOS/Linux or `py -m pip` on Windows.
 
-> ⚠️ `pip install bpp` **yazmayın**. PyPI'daki `bpp` adlı paket bu proje değil, başka bir paket.
+> ⚠️ **Don't run `pip install bpp`.** The package called `bpp` on PyPI is an unrelated project.
 
-Kesin token sayımı da görmek isterseniz (isteğe bağlı):
-
-```bash
-pip install tiktoken
-```
-
-### 3. Çalışıyor mu?
+Optional: `pip install tiktoken` to get exact token counts instead of estimates.
 
 ```bash
-bpp --version
+bpp --version      # bpp 0.2.0
 ```
 
-Çıktı `bpp 0.2.0` olmalı. `bpp` komutu bulunamazsa aynı her şeyi `python -m bpp` ile
-çalıştırabilirsiniz (örneğin `python -m bpp --version`).
-
-## Kullanım
-
-### Bir dosyayı çevirin
-
-Denemek için hazır bir örnek dosya indirebilirsiniz
-([tarayıcıda aç](https://github.com/E7lektronXF/bpp/blob/HEAD/examples/siparisler.json)) ya da
-terminalden:
-
-```bash
-curl -O https://raw.githubusercontent.com/E7lektronXF/bpp/HEAD/examples/siparisler.json
-```
-
-(Windows PowerShell'de `curl.exe -O ...` yazın.)
-
-Terminalde dosyanın bulunduğu klasöre geçin (örneğin `cd Desktop`) ve dosya adını verin:
+### 2. Convert a file
 
 ```console
-$ bpp siparisler.json
-siparisler.json -> siparisler.bpp (o200k: 149 -> 74 tokens, -50%)
+$ bpp quickstart.json
+quickstart.json -> quickstart.bpp (o200k: 122 -> 53 tokens, -57%)
 ```
 
-Yanına `siparisler.bpp` oluşur. `.json`, `.yaml`, `.csv` ve `.md` dosyalarıyla çalışır.
+This works with `.json`, `.yaml`, `.csv` and `.md` files. Want a sample to try?
+`curl -O https://raw.githubusercontent.com/E7lektronXF/bpp/HEAD/examples/quickstart.json`
 
-`siparisler.json`:
+### 3. Give it to your LLM
 
-```json
-{
-  "magaza": "Kadıköy Şubesi",
-  "siparisler": [
-    {"no": 1, "musteri": "Ayşe Yılmaz", "urun": "Kulaklık", "adet": 2, "fiyat": 749.9},
-    {"no": 2, "musteri": "Can Demir", "urun": "Klavye", "adet": 1, "fiyat": 1299.0},
-    {"no": 3, "musteri": "Şule Öztürk", "urun": "Kulaklık", "adet": 1, "fiyat": 749.9}
-  ]
-}
+Open `quickstart.bpp`, then paste it into ChatGPT, Claude or your prompt template. If the model
+hasn't seen the format before, add `--primer`. It prepends a one-line explanation (~70 tokens):
+
+```bash
+bpp quickstart.json --primer -o -     # print to the terminal instead of writing a file
 ```
-
-`siparisler.bpp`:
 
 ```
 bpp2
-magaza Kadıköy Şubesi
-siparisler[3]{no urun adet fiyat musteri}
-1 Kulaklık 2 749.9 Ayşe Yılmaz
-2 Klavye 1 1299.0 Can Demir
-3 Kulaklık 1 749.9 Şule Öztürk
+# bpp2: JSON as 'key value' lines, 1-space indent nests. k[N]{a b}: N rows of values in column order, last column = rest of line; x? = optional ('-' if absent), x?= columns appear as x=v. "..." = JSON string, *n = &n.
+store Downtown Branch
+...
 ```
 
-### LLM'e verin
-
-`siparisler.bpp`'yi bir metin editöründe açın, içeriğini kopyalayıp ChatGPT, Claude vb. sohbet
-penceresine yapıştırın ve sorunuzu yazın. Model formatı ilk kez görecekse `--primer` ekleyin;
-dosyanın başına formatı anlatan tek bir açıklama satırı (~70 token) eklenir:
-
-```bash
-bpp siparisler.json --primer
-```
-
-Dosya oluşturmadan doğrudan ekrana yazdırmak için `-o -` kullanın:
-
-```bash
-bpp siparisler.json --primer -o -
-```
-
-### Geri çevirin
+### 4. Convert back
 
 ```console
-$ bpp siparisler.bpp -o geri.json
+$ bpp quickstart.bpp -o roundtrip.json
 ```
 
-`geri.json`, orijinal veriyle birebir aynı veriyi içerir. YAML, CSV veya Markdown istiyorsanız
-çıktı dosyasının uzantısını değiştirin (`-o geri.yaml`) ya da `--to yaml` yazın. bpp, var olan bir
-dosyanın üzerine sormadan yazmaz; üzerine yazmak için `--force` ekleyin.
+`roundtrip.json` holds exactly the original data. Use `-o file.yaml`, `-o file.csv` or `--to md`
+for other formats. bpp never silently overwrites an existing file; pass `--force` to allow it.
 
-### Kaç token kazandığınızı görün
+### Compare formats yourself
 
 ```console
-$ bpp stats siparisler.json
+$ bpp stats quickstart.json
 format           chars  o200k  claude2  vs JSON (o200k)  vs JSON (claude2)
-JSON (indent 2)    424    173      186            +0.0%              +0.0%
-JSON (minified)    261    109      129           -37.0%             -30.6%
-YAML               257    130      130           -24.9%             -30.1%
-bpp                159     74       83           -57.2%             -55.4%
-bpp + primer       377    144      157           -16.8%             -15.6%
+JSON (indent 2)    434    146      136            +0.0%              +0.0%
+JSON (minified)    271     82       81           -43.8%             -40.4%
+YAML               261    102       82           -30.1%             -39.7%
+bpp                163     53       48           -63.7%             -64.7%
+bpp + primer       381    123      122           -15.8%             -10.3%
 ```
 
-`o200k` ve `claude2` sütunları için `pip install tiktoken` gerekir; kurulu değilse yaklaşık bir tahmin
-(`estimate`) gösterilir. Bu kadar küçük bir dosyada primer satırı kazancın çoğunu yer; primer'i
-büyük dosyalarda kullanın.
+On a file this small the primer eats most of the savings. Use it on larger inputs.
 
-### Python kodundan kullanın
+### From Python
 
 ```python
 import bpp
 
-metin = bpp.dumps(veri)          # Python nesnesi -> .bpp metni (LLM'e gönderilecek)
-veri = bpp.loads(metin)          # .bpp metni -> Python nesnesi
+text = bpp.dumps(data)          # Python object -> bpp text (send this to the LLM)
+data = bpp.loads(text)          # bpp text -> Python object
 
-veri = bpp.load("config.yaml")   # .json .yaml .csv .md .bpp dosyası okur
-bpp.dump(veri, "config.bpp")     # biçimi uzantıdan seçer
+data = bpp.load("config.yaml")  # reads .json .yaml .csv .md .bpp
+bpp.dump(data, "config.bpp")    # format chosen by extension
 ```
 
-### Sık karşılaşılan sorunlar
-
-| sorun | çözüm |
-|---|---|
-| `bpp: command not found` / `'bpp' is not recognized` | `python -m bpp ...` kullanın ya da terminali yeniden açın. |
-| `pip: command not found` | Windows: `py -m pip install ...` · macOS/Linux: `python3 -m pip install ...` |
-| `error: externally-managed-environment` (yeni macOS/Linux) | `pipx install https://github.com/E7lektronXF/bpp/archive/HEAD.zip` ya da bir sanal ortam kullanın: `python3 -m venv .venv && . .venv/bin/activate` ve 2. adımı tekrarlayın. |
-| `cannot infer format` | Dosya uzantısı `.json .yaml .yml .csv .md .bpp` olmalı. |
-| `... exists; use -o ...` | Geri çevirirken orijinal dosyanın üzerine yazılmasın diye durdu. `-o başka_ad.json` verin. |
-
-Kaldırmak için: `pip uninstall bpp`.
-
-## Nasıl görünüyor?
-
-<table>
-<tr><th>JSON (601 token)</th><th>.bpp (323 token)</th></tr>
-<tr><td>
-
-```json
-{
-  "server": {
-    "host": "0.0.0.0",
-    "port": 8080,
-    "tls": {"enabled": true}
-  },
-  "replicas": [
-    {"host": "db-1.internal", "port": 5432, "weight": 2},
-    {"host": "db-2.internal", "port": 5432, "weight": 1}
-  ],
-  "regions": ["TR", "DE", "NL"]
-}
-```
-
-</td><td>
+## The format in one minute
 
 ```
 bpp2
@@ -203,13 +142,20 @@ db-2.internal 5432 1
 regions [TR,DE,NL]
 ```
 
-</td></tr>
-</table>
+* **`key value` lines.** A bare `key` opens a nested object, and nesting is one space of
+  indentation. There are no braces, no colons and no quotes unless a value needs them.
+* **Tables:** `name[N]{a b c}` is followed by N rows of values in column order. Keys are written
+  once instead of on every object. The last column takes the rest of the line, so free text
+  needs no quotes.
+* **Optional columns:** `x?` sits in place, with `-` when absent. `x?=` appears only when present,
+  as `x=value`.
+* **Trees:** `>steps` means rows indented under a row are its children. This is how plans are
+  written.
+* **Dictionary:** a long value repeated many times is written once as `&0 value` and referenced
+  as `*0`, in YAML anchor style. It is used only when it measurably saves tokens.
+* **Strings** are quoted JSON-style only when they would be ambiguous. Unicode stays raw UTF-8.
 
-(Token sayıları `examples/config.yaml`'ın tamamı içindir. Yukarıdaki parça o dosyanın kısaltılmış
-halidir.)
-
-Bir plan (`examples/plan.json`, JSON'da 1609 token, .bpp'de 636):
+A plan with dependencies (`examples/plan.json`: 1609 tokens as JSON, 636 as bpp):
 
 ```
 steps[6]{id:str status priority deps:str owner?= note?= title}>steps
@@ -220,8 +166,8 @@ steps[6]{id:str status priority deps:str owner?= note?= title}>steps
 2 done P1 [1] owner=Mehmet Mimari tasarım
 ```
 
-Bir Markdown checklist'i (`examples/project_plan.md`, Markdown'da 837 token, .bpp'de 792). Durumu
-olmayan satırlarda `-` yazılır:
+A Markdown checklist (`examples/project_plan.md`: 837 tokens as Markdown, 792 as bpp). Headings
+and nested lists become a tree; `[ ]` `[x]` `[/]` `[-]` become `todo` `done` `doing` `cancelled`:
 
 ```
 steps[5]{status? note?= title}>steps
@@ -231,117 +177,98 @@ steps[5]{status? note?= title}>steps
   done Pazarlama analitiği
 ```
 
-Kurallar kısaca:
+The full grammar and the measurement behind each rule are in [SPEC.md](SPEC.md) (in Turkish).
 
-* `anahtar değer` satırları; tek başına `anahtar` iç içe nesne açar (1 boşluk girinti).
-* `ad[N]{a b c}` → N satır, değerler sütun sırasıyla boşlukla ayrılmış, **son sütun satırın
-  geri kalanı**. `>steps` → girintili satırlar üstteki satırın alt adımlarıdır.
-* Opsiyonel sütunlar: `x?` yerinde yazılır, değer yoksa `-`; `x?=` yalnızca varsa `x=değer`
-  diye yazılır. (Encoder sık olanı `x?`, seyrek olanı `x?=` yapar.)
-* `"..."` → JSON string (yalnızca gerektiğinde tırnak). `[a,b]` → liste.
-* `&0 uzun metin` bir kez tanımlanır, sonra `*0` diye kullanılır.
+## Why it is smaller
 
-Tam tanım: [SPEC.md](SPEC.md). `examples/` klasöründe her örneğin kaynak dosyası ve `.bpp`
-karşılığı yan yana duruyor.
+LLMs read tokens, and tokenizers are trained on English, code and JSON. Invented symbols or binary
+encodings usually cost more tokens and hurt understanding. bpp saves tokens by:
 
-## Primer satırı
+1. **Removing repetition.** Object keys are written once per table, not once per row.
+2. **Dropping punctuation the tokenizer charges for.** A space merges into the next token; `:`,
+   `,` and `"` usually don't. Switching table rows from commas to spaces alone saved 12–22%.
+3. **Referencing long repeated values** through a small dictionary, but only when the estimated
+   gain is positive.
+4. **Keeping structure explicit:** row counts (`[N]`), column names and indentation give the model
+   a frame to read against.
 
-Formatı hiç görmemiş bir model için `--primer` dosyanın başına şu `#` yorum satırını ekler
-(decoder yok sayar):
+## Guarantees
 
-```
-# bpp2: JSON as 'key value' lines, 1-space indent nests. k[N]{a b}: N rows of values in column order, last column = rest of line; x? = optional ('-' if absent), x?= columns appear as x=v. "..." = JSON string, *n = &n.
-```
+| input | round trip |
+|---|---|
+| JSON / YAML | `loads(dumps(x)) == x`, types included (`1` ≠ `1.0`, `"42"` ≠ `42`, `null`). With `--keep-order`, the JSON text comes back identical, key order included. YAML comments and anchors are not data and are not kept. Dates stay strings. |
+| CSV | Cells and column order come back byte for byte. Numbers are typed only when writing them back gives the same text (`007` and `1.50` stay strings). |
+| Markdown | Structure is kept, formatting is not. Output is normalized Markdown that parses back to the same tree. |
 
-Primer ~70 token tutar. Küçük belgelerde (birkaç yüz token) kazancı silebilir; BENCHMARK §4.2'ye
-bakın.
+Backed by 207 tests: edge cases (empty containers, 80-level nesting, delimiters inside strings,
+multi-line text, Unicode, number-like strings) and hypothesis property tests on random JSON, CSV,
+YAML and Markdown trees.
 
-## Sonuçlar (özet)
+## Honest caveats
 
-| örnek | JSON | minified JSON | TOON | **.bpp** | .bpp en iyi rakibe göre |
-|---|---:|---:|---:|---:|---|
-| 60×10 tablo (CSV) | 5538 | 3562 | 2277 | **2042** | −%6 (CSV) |
-| iç içe config (YAML) | 601 | 365 | 399 | **323** | −%12 (min. JSON) |
-| yapılandırılmış plan (JSON) | 1609 | 990 | 1228 | **636** | −%36 (min. JSON) |
-| Markdown checklist planı | 1501 | 1025 | 1093 | **792** | −%5 (kaynak Markdown: 837) |
-| karışık API yanıtı | 3524 | 2231 | 2276 | **1762** | −%21 (min. JSON) |
-| tekrarlı loglar | 5629 | 4109 | 3348 | **1857** | −%42 (CSV) |
+* **Understanding is not measured yet.** Token savings are measured. Whether models answer
+  questions about bpp as accurately as about JSON is not yet known. A ready-to-run comprehension
+  benchmark (10 auto-graded questions per dataset, every format) is included:
+  `ANTHROPIC_API_KEY=... python bench/run_qa.py`. The biggest risk is the dictionary: the model
+  has to resolve `*3` to its definition.
+* **Token counts are proxies.** They come from tiktoken `o200k_base` and Anthropic's older public
+  Claude tokenizer. Current Claude models use a different tokenizer. Set `ANTHROPIC_API_KEY` and
+  `bpp stats` adds real `count_tokens` numbers.
+* **Small gains in some cases:** plain flat tables are only ~6% smaller than CSV on o200k (17% on
+  claude2). The primer (~70 tokens) cancels the savings on documents of a few hundred tokens.
 
-o200k token'ı. claude2 tokenizer'ı ile sonuçlar aynı yönde. Ayrıntılar, anlama testi ve
-kaybedilen durumların analizi için [BENCHMARK.md](BENCHMARK.md). **Not:** anlama/doğruluk testi
-yazıldı ama API anahtarı olmadığı için henüz çalıştırılmadı (`python bench/run_qa.py`).
+## Command reference
 
-## Kurulum seçenekleri (geliştiriciler için)
-
-```bash
-git clone https://github.com/E7lektronXF/bpp.git && cd bpp
-pip install .            # yalnızca PyYAML gerekir
-pip install ".[stats]"   # + tiktoken: bpp stats token sayar
-pip install ".[api]"     # + anthropic: gerçek Claude token sayımı ve anlama testi
-pip install -e ".[dev]"  # + pytest, hypothesis
-```
-
-Python ≥ 3.9.
-
-## Tüm komutlar
-
-Kısayol (`bpp DOSYA`) çoğu iş için yeterlidir. Ayrıntılı alt komutlar:
+`bpp FILE` covers most uses. It encodes, or decodes if FILE ends in `.bpp`. The full subcommands:
 
 ```bash
 bpp encode data.json -o data.bpp [--primer none|short|long] [--no-refs] [--keep-order]
-bpp encode - --from yaml < config.yaml          # stdin
-bpp decode data.bpp -o data.yaml                # biçim -o uzantısından
-bpp decode data.bpp --to json --indent -1       # minified JSON'a
+bpp encode - --from yaml < config.yaml       # read from stdin
+bpp decode data.bpp -o data.yaml             # output format from the extension
+bpp decode data.bpp --to json --indent -1    # minified JSON
 bpp decode plan.bpp --to md
 bpp stats data.json [--markdown]
 ```
 
-| seçenek | etkisi |
+| option | effect |
 |---|---|
-| `--primer` | Başa açıklama satırı ekler (`short` ~70, `long` ~115 token). |
-| `--no-refs` | `&n`/`*n` sözlüğünü kapatır. |
-| `--keep-order` | Anahtar sırasını hiç değiştirmez. Varsayılanda encoder, `title` gibi bir metin sütununu satır sonuna taşıyabilir (veri aynı, JSON'daki anahtar sırası farklı). CSV'de her zaman açık. |
-| `-f/--force` | Kısayol modunda var olan dosyanın üzerine yazar (varsayılan: yazmaz). |
+| `--primer` | Prepend a format explanation (`short` ~70, `long` ~115 tokens). |
+| `--no-refs` | Disable the `&n`/`*n` dictionary. |
+| `--keep-order` | Never reorder keys. By default a table may move a free-text column such as `title` to the end of each row, which changes JSON key order but not the data. Always on for CSV input. |
+| `-o -` | Write to stdout. |
+| `-f`, `--force` | Allow overwriting an existing file in one-step mode. |
 
-## Kayıpsızlık
+## Troubleshooting
 
-* **JSON / YAML:** `loads(dumps(x)) == x`, tipler dahil (`1` ≠ `1.0`, `"42"` ≠ `42`, `null`).
-  `--keep-order` ile JSON metni anahtar sırasıyla birlikte birebir geri gelir. YAML yorumları ve
-  anchor'ları veri değildir, korunmaz. Tarihler string olarak okunur.
-* **CSV:** hücreler ve sütun sırası birebir korunur. Sayıya çevirme yalnızca geri yazınca aynı
-  metni veriyorsa yapılır (`007`, `1.50` string kalır). Satırsız, yalnız başlıktan oluşan CSV'de
-  başlık kaybolur.
-* **Markdown:** yapı korunur, biçim korunmaz. Başlıklar ve iç içe listeler ağaca dönüşür;
-  `- [ ]` / `[x]` / `[/]` / `[-]` → `status` todo / done / doing / cancelled; paragraflar ve kod
-  blokları `note` olur.
+| problem | fix |
+|---|---|
+| `bpp: command not found` | Use `python -m bpp ...`, or open a new terminal. |
+| `pip: command not found` | `python3 -m pip install ...` (macOS/Linux) or `py -m pip install ...` (Windows). |
+| `externally-managed-environment` | `pipx install https://github.com/E7lektronXF/bpp/archive/HEAD.zip`, or install inside a virtualenv (`python3 -m venv .venv && . .venv/bin/activate`). |
+| `cannot infer format` | Use one of these extensions: `.json .yaml .yml .csv .md .bpp`. |
+| `... exists; use -o ...` | bpp refused to overwrite your original file. Pick another name with `-o`. |
 
-## Token sayımı
+Upgrade with `pip install --upgrade https://github.com/E7lektronXF/bpp/archive/HEAD.zip`. Uninstall
+with `pip uninstall bpp`.
 
-`bpp stats` kurulu olan sayaçları kullanır:
-
-* **o200k** (tiktoken). İndirme sunucusuna erişilemezse aynı dosyayı npm'den alır ve SHA-256
-  ile doğrular.
-* **claude2**: Anthropic'in yayımladığı eski Claude tokenizer'ı.
-* **anthropic**: `ANTHROPIC_API_KEY` varsa gerçek `count_tokens`. Varsayılan model
-  `claude-opus-5`; `BPP_ANTHROPIC_MODEL` ile değiştirilir.
-
-İlk ikisi güncel Claude için yalnızca vekildir; formatlar arası göreli fark için kullanılır. TOON
-satırı için `cd bench/toon && npm install` gerekir.
-
-## Geliştirme
+## Development
 
 ```bash
-pip install -e ".[dev]"
-pytest -q                      # 205 test: round-trip, uç durumlar, hypothesis, CLI
-python bench/run_tokens.py     # token benchmark'ını yeniden üret
-python bench/experiments.py    # SPEC'teki tasarım deneyleri
+git clone https://github.com/E7lektronXF/bpp.git && cd bpp
+pip install -e ".[dev]"        # + pytest, hypothesis, tiktoken
+pytest -q                      # 207 tests
+python bench/run_tokens.py     # regenerate the token benchmark
+python bench/experiments.py    # the design experiments behind SPEC.md
+python bench/run_qa.py         # comprehension benchmark (needs ANTHROPIC_API_KEY)
 ```
 
+The TOON column needs Node.js and `cd bench/toon && npm install`.
+
 ```
-SPEC.md          format spesifikasyonu ve her kararın ölçümü
-BENCHMARK.md     token sonuçları, anlama testi, kayıplar ve revizyon önerileri
-src/bpp/         encoder, decoder, dönüştürücüler, CLI
-examples/        örnek girdiler ve .bpp karşılıkları
-bench/           deneyler, benchmark ve anlama testi betikleri
-tests/           pytest + hypothesis
+SPEC.md        format specification and the measurement behind every rule
+BENCHMARK.md   token results, comprehension test, losses and proposed revisions
+src/bpp/       encoder, decoder, converters, CLI
+examples/      sample inputs next to their .bpp output
+bench/         experiments, token benchmark, comprehension benchmark
+tests/         pytest + hypothesis
 ```

@@ -1,0 +1,8 @@
+{
+  "store": "Downtown Branch",
+  "orders": [
+    {"id": 1, "customer": "Alice Johnson", "product": "Headphones", "qty": 2, "price": 79.9},
+    {"id": 2, "customer": "Bob Smith", "product": "Keyboard", "qty": 1, "price": 129.0},
+    {"id": 3, "customer": "Carol White", "product": "Headphones", "qty": 1, "price": 79.9}
+  ]
+}

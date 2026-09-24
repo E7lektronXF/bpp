@@ -1,0 +1,6 @@
+bpp2
+store Downtown Branch
+orders[3]{id product qty price customer}
+1 Headphones 2 79.9 Alice Johnson
+2 Keyboard 1 129.0 Bob Smith
+3 Headphones 1 79.9 Carol White
