@@ -80,3 +80,28 @@ def test_stdin_and_console_script(files):
     q = subprocess.run([sys.executable, "-m", "bpp.cli", "decode", "-"],
                        input=p.stdout, capture_output=True, text=True, encoding="utf-8", check=True)
     assert json.loads(q.stdout) == json.loads(src)
+
+
+def test_one_step_mode(files, capsys):
+    assert run(files / "c.json") == 0
+    assert (files / "c.bpp").exists()
+    assert "c.bpp" in capsys.readouterr().err
+    assert run(files / "c.bpp") == 1  # would overwrite c.json
+    assert run(files / "c.bpp", "-o", files / "back.json") == 0
+    assert json.loads((files / "back.json").read_text(encoding="utf-8")) == ds.config()
+    assert run(files / "c.bpp", "--to", "yaml") == 0 and (files / "c.yaml").exists()
+    assert run(files / "e.csv") == 0 and run(files / "e.bpp", "-o", "-", "--to", "csv") == 0
+    assert capsys.readouterr().out == (files / "e.csv").read_text(encoding="utf-8")
+    assert run(files / "p.md", "-o", "-", "--primer") == 0
+    assert capsys.readouterr().out.startswith("bpp1\n# bpp1:")
+
+
+def test_python_api(files):
+    import bpp
+
+    d = bpp.load(files / "y.yaml")
+    assert d == {"a": 1, "b": ["x", "y"], "d": "2026-01-01"}
+    assert bpp.loads(bpp.dumps(d)) == d
+    bpp.dump(d, files / "y.bpp")
+    bpp.dump(d, files / "y2.json")
+    assert bpp.load(files / "y.bpp") == bpp.load(files / "y2.json") == d

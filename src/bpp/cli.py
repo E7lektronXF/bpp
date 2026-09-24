@@ -122,8 +122,66 @@ def cmd_stats(a) -> int:
     return 0
 
 
+# ------------------------------------------------------------ one-step mode
+
+def _savings(src: str, out: str) -> str:
+    try:
+        from .tokens import available_counters
+
+        name, fn = next(iter(available_counters().items()))
+    except Exception:
+        return ""
+    if name == "chars/4":
+        return ""
+    a, b = fn(src), fn(out)
+    return f" ({name}: {a} -> {b} tokens, {100 * (b - a) / a:+.0f}%)" if a else ""
+
+
+def cmd_auto(a) -> int:
+    """`bpp FILE`: .bpp files are decoded, everything else is encoded."""
+    src = Path(a.input)
+    if src.suffix.lower() == ".bpp":
+        to = a.to or (detect(a.output) if a.output and a.output != "-" else "json")
+        out = a.output or str(src.with_suffix("." + {"yaml": "yaml", "md": "md",
+                                                        "csv": "csv"}.get(to, "json")))
+        if out != "-" and Path(out).exists() and not a.force:
+            raise ValueError(f"{out} exists; use -o to pick another name or --force to overwrite")
+        text = dumps(loads(_read(a.input), "bpp"), to)
+        _write(out, text)
+    else:
+        fmt = detect(src)
+        raw = _read(a.input)
+        out = a.output or str(src.with_suffix(".bpp"))
+        text = dumps(loads(raw, fmt), "bpp", primer=a.primer, keep_order=fmt == "csv")
+        _write(out, text)
+        if out != "-":
+            print(f"{src} -> {out}{_savings(raw, text)}", file=sys.stderr)
+    return 0
+
+
+def _auto_main(argv: list[str]) -> int:
+    p = argparse.ArgumentParser(
+        prog="bpp", description="bpp FILE: encode json/yaml/csv/md to FILE.bpp, or decode "
+        "FILE.bpp to json. Subcommands: encode, decode, stats (bpp <cmd> -h).")
+    p.add_argument("input")
+    p.add_argument("-o", "--output", help="output file, '-' for stdout (default: next to input)")
+    p.add_argument("--to", choices=["json", "yaml", "csv", "md"], help="decode target format")
+    p.add_argument("--primer", action="store_true", help="add a one-line format explanation")
+    p.add_argument("-f", "--force", action="store_true", help="overwrite when decoding")
+    a = p.parse_args(argv)
+    try:
+        return cmd_auto(a)
+    except (ValueError, OSError) as ex:
+        print(f"bpp: error: {ex}", file=sys.stderr)
+        return 1
+
+
 def main(argv: list[str] | None = None) -> int:
-    p = argparse.ArgumentParser(prog="bpp", description="Token-efficient data format for LLMs.")
+    argv = sys.argv[1:] if argv is None else argv
+    if argv and argv[0] not in ("encode", "decode", "stats", "-h", "--help", "--version"):
+        return _auto_main(argv)
+    p = argparse.ArgumentParser(prog="bpp", description="Token-efficient data format for LLMs. "
+                                "Shortcut: bpp FILE (encode, or decode if FILE is .bpp).")
     p.add_argument("--version", action="version", version=f"bpp {__version__}")
     sub = p.add_subparsers(dest="cmd", required=True)
 

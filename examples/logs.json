@@ -1,0 +1,562 @@
+[
+  {
+    "ts": "2026-09-24T10:00:00Z",
+    "level": "WARN",
+    "service": "orders-api-eu-central-1",
+    "message": "User session expired; redirecting to the login page",
+    "latency_ms": 12127
+  },
+  {
+    "ts": "2026-09-24T10:00:01Z",
+    "level": "INFO",
+    "service": "auth-service-eu-west-1",
+    "message": "Connection to upstream payment provider timed out after 30000ms",
+    "latency_ms": 19849
+  },
+  {
+    "ts": "2026-09-24T10:00:02Z",
+    "level": "WARN",
+    "service": "auth-service-eu-west-1",
+    "message": "Rate limit exceeded for API key; request rejected with 429",
+    "latency_ms": 18053
+  },
+  {
+    "ts": "2026-09-24T10:00:03Z",
+    "level": "WARN",
+    "service": "payments-gateway-eu-west-1",
+    "message": "Database replica lag above threshold, falling back to primary",
+    "latency_ms": 17731
+  },
+  {
+    "ts": "2026-09-24T10:00:04Z",
+    "level": "INFO",
+    "service": "auth-service-eu-west-1",
+    "message": "Database replica lag above threshold, falling back to primary",
+    "latency_ms": 20945
+  },
+  {
+    "ts": "2026-09-24T10:00:05Z",
+    "level": "WARN",
+    "service": "payments-gateway-eu-west-1",
+    "message": "User session expired; redirecting to the login page",
+    "latency_ms": 28449
+  },
+  {
+    "ts": "2026-09-24T10:00:06Z",
+    "level": "INFO",
+    "service": "auth-service-eu-west-1",
+    "message": "Connection to upstream payment provider timed out after 30000ms",
+    "latency_ms": 22005
+  },
+  {
+    "ts": "2026-09-24T10:00:07Z",
+    "level": "WARN",
+    "service": "payments-gateway-eu-west-1",
+    "message": "Connection to upstream payment provider timed out after 30000ms",
+    "latency_ms": 9876
+  },
+  {
+    "ts": "2026-09-24T10:00:08Z",
+    "level": "WARN",
+    "service": "auth-service-eu-west-1",
+    "message": "Database replica lag above threshold, falling back to primary",
+    "latency_ms": 19493
+  },
+  {
+    "ts": "2026-09-24T10:00:09Z",
+    "level": "INFO",
+    "service": "auth-service-eu-west-1",
+    "message": "Database replica lag above threshold, falling back to primary",
+    "latency_ms": 12947
+  },
+  {
+    "ts": "2026-09-24T10:00:10Z",
+    "level": "INFO",
+    "service": "orders-api-eu-central-1",
+    "message": "Database replica lag above threshold, falling back to primary",
+    "latency_ms": 4400
+  },
+  {
+    "ts": "2026-09-24T10:00:11Z",
+    "level": "ERROR",
+    "service": "payments-gateway-eu-west-1",
+    "message": "Connection to upstream payment provider timed out after 30000ms",
+    "latency_ms": 4460
+  },
+  {
+    "ts": "2026-09-24T10:00:12Z",
+    "level": "ERROR",
+    "service": "payments-gateway-eu-west-1",
+    "message": "Rate limit exceeded for API key; request rejected with 429",
+    "latency_ms": 22026
+  },
+  {
+    "ts": "2026-09-24T10:00:13Z",
+    "level": "ERROR",
+    "service": "orders-api-eu-central-1",
+    "message": "Rate limit exceeded for API key; request rejected with 429",
+    "latency_ms": 13805
+  },
+  {
+    "ts": "2026-09-24T10:00:14Z",
+    "level": "INFO",
+    "service": "auth-service-eu-west-1",
+    "message": "Rate limit exceeded for API key; request rejected with 429",
+    "latency_ms": 17506
+  },
+  {
+    "ts": "2026-09-24T10:00:15Z",
+    "level": "INFO",
+    "service": "auth-service-eu-west-1",
+    "message": "User session expired; redirecting to the login page",
+    "latency_ms": 29633
+  },
+  {
+    "ts": "2026-09-24T10:00:16Z",
+    "level": "ERROR",
+    "service": "orders-api-eu-central-1",
+    "message": "Connection to upstream payment provider timed out after 30000ms",
+    "latency_ms": 28067
+  },
+  {
+    "ts": "2026-09-24T10:00:17Z",
+    "level": "ERROR",
+    "service": "orders-api-eu-central-1",
+    "message": "User session expired; redirecting to the login page",
+    "latency_ms": 22897
+  },
+  {
+    "ts": "2026-09-24T10:00:18Z",
+    "level": "ERROR",
+    "service": "orders-api-eu-central-1",
+    "message": "Connection to upstream payment provider timed out after 30000ms",
+    "latency_ms": 23395
+  },
+  {
+    "ts": "2026-09-24T10:00:19Z",
+    "level": "INFO",
+    "service": "payments-gateway-eu-west-1",
+    "message": "Rate limit exceeded for API key; request rejected with 429",
+    "latency_ms": 9342
+  },
+  {
+    "ts": "2026-09-24T10:00:20Z",
+    "level": "WARN",
+    "service": "payments-gateway-eu-west-1",
+    "message": "Database replica lag above threshold, falling back to primary",
+    "latency_ms": 27986
+  },
+  {
+    "ts": "2026-09-24T10:00:21Z",
+    "level": "INFO",
+    "service": "auth-service-eu-west-1",
+    "message": "Connection to upstream payment provider timed out after 30000ms",
+    "latency_ms": 11279
+  },
+  {
+    "ts": "2026-09-24T10:00:22Z",
+    "level": "WARN",
+    "service": "auth-service-eu-west-1",
+    "message": "User session expired; redirecting to the login page",
+    "latency_ms": 664
+  },
+  {
+    "ts": "2026-09-24T10:00:23Z",
+    "level": "ERROR",
+    "service": "auth-service-eu-west-1",
+    "message": "Database replica lag above threshold, falling back to primary",
+    "latency_ms": 28603
+  },
+  {
+    "ts": "2026-09-24T10:00:24Z",
+    "level": "WARN",
+    "service": "payments-gateway-eu-west-1",
+    "message": "Connection to upstream payment provider timed out after 30000ms",
+    "latency_ms": 12384
+  },
+  {
+    "ts": "2026-09-24T10:00:25Z",
+    "level": "INFO",
+    "service": "orders-api-eu-central-1",
+    "message": "Rate limit exceeded for API key; request rejected with 429",
+    "latency_ms": 18055
+  },
+  {
+    "ts": "2026-09-24T10:00:26Z",
+    "level": "ERROR",
+    "service": "orders-api-eu-central-1",
+    "message": "User session expired; redirecting to the login page",
+    "latency_ms": 1185
+  },
+  {
+    "ts": "2026-09-24T10:00:27Z",
+    "level": "ERROR",
+    "service": "payments-gateway-eu-west-1",
+    "message": "Connection to upstream payment provider timed out after 30000ms",
+    "latency_ms": 3547
+  },
+  {
+    "ts": "2026-09-24T10:00:28Z",
+    "level": "INFO",
+    "service": "orders-api-eu-central-1",
+    "message": "Connection to upstream payment provider timed out after 30000ms",
+    "latency_ms": 6472
+  },
+  {
+    "ts": "2026-09-24T10:00:29Z",
+    "level": "ERROR",
+    "service": "auth-service-eu-west-1",
+    "message": "Rate limit exceeded for API key; request rejected with 429",
+    "latency_ms": 5123
+  },
+  {
+    "ts": "2026-09-24T10:00:30Z",
+    "level": "INFO",
+    "service": "payments-gateway-eu-west-1",
+    "message": "Rate limit exceeded for API key; request rejected with 429",
+    "latency_ms": 10288
+  },
+  {
+    "ts": "2026-09-24T10:00:31Z",
+    "level": "ERROR",
+    "service": "payments-gateway-eu-west-1",
+    "message": "Database replica lag above threshold, falling back to primary",
+    "latency_ms": 12350
+  },
+  {
+    "ts": "2026-09-24T10:00:32Z",
+    "level": "ERROR",
+    "service": "orders-api-eu-central-1",
+    "message": "Database replica lag above threshold, falling back to primary",
+    "latency_ms": 21103
+  },
+  {
+    "ts": "2026-09-24T10:00:33Z",
+    "level": "INFO",
+    "service": "orders-api-eu-central-1",
+    "message": "Connection to upstream payment provider timed out after 30000ms",
+    "latency_ms": 20325
+  },
+  {
+    "ts": "2026-09-24T10:00:34Z",
+    "level": "INFO",
+    "service": "auth-service-eu-west-1",
+    "message": "Database replica lag above threshold, falling back to primary",
+    "latency_ms": 20789
+  },
+  {
+    "ts": "2026-09-24T10:00:35Z",
+    "level": "INFO",
+    "service": "orders-api-eu-central-1",
+    "message": "User session expired; redirecting to the login page",
+    "latency_ms": 9871
+  },
+  {
+    "ts": "2026-09-24T10:00:36Z",
+    "level": "ERROR",
+    "service": "auth-service-eu-west-1",
+    "message": "Rate limit exceeded for API key; request rejected with 429",
+    "latency_ms": 17975
+  },
+  {
+    "ts": "2026-09-24T10:00:37Z",
+    "level": "ERROR",
+    "service": "payments-gateway-eu-west-1",
+    "message": "Database replica lag above threshold, falling back to primary",
+    "latency_ms": 19009
+  },
+  {
+    "ts": "2026-09-24T10:00:38Z",
+    "level": "ERROR",
+    "service": "payments-gateway-eu-west-1",
+    "message": "Database replica lag above threshold, falling back to primary",
+    "latency_ms": 20183
+  },
+  {
+    "ts": "2026-09-24T10:00:39Z",
+    "level": "INFO",
+    "service": "orders-api-eu-central-1",
+    "message": "User session expired; redirecting to the login page",
+    "latency_ms": 1973
+  },
+  {
+    "ts": "2026-09-24T10:00:40Z",
+    "level": "INFO",
+    "service": "orders-api-eu-central-1",
+    "message": "Rate limit exceeded for API key; request rejected with 429",
+    "latency_ms": 15283
+  },
+  {
+    "ts": "2026-09-24T10:00:41Z",
+    "level": "ERROR",
+    "service": "orders-api-eu-central-1",
+    "message": "Rate limit exceeded for API key; request rejected with 429",
+    "latency_ms": 19956
+  },
+  {
+    "ts": "2026-09-24T10:00:42Z",
+    "level": "INFO",
+    "service": "auth-service-eu-west-1",
+    "message": "Database replica lag above threshold, falling back to primary",
+    "latency_ms": 731
+  },
+  {
+    "ts": "2026-09-24T10:00:43Z",
+    "level": "INFO",
+    "service": "payments-gateway-eu-west-1",
+    "message": "Connection to upstream payment provider timed out after 30000ms",
+    "latency_ms": 12101
+  },
+  {
+    "ts": "2026-09-24T10:00:44Z",
+    "level": "ERROR",
+    "service": "orders-api-eu-central-1",
+    "message": "Database replica lag above threshold, falling back to primary",
+    "latency_ms": 9790
+  },
+  {
+    "ts": "2026-09-24T10:00:45Z",
+    "level": "INFO",
+    "service": "orders-api-eu-central-1",
+    "message": "Rate limit exceeded for API key; request rejected with 429",
+    "latency_ms": 5818
+  },
+  {
+    "ts": "2026-09-24T10:00:46Z",
+    "level": "ERROR",
+    "service": "payments-gateway-eu-west-1",
+    "message": "Rate limit exceeded for API key; request rejected with 429",
+    "latency_ms": 24846
+  },
+  {
+    "ts": "2026-09-24T10:00:47Z",
+    "level": "ERROR",
+    "service": "orders-api-eu-central-1",
+    "message": "Rate limit exceeded for API key; request rejected with 429",
+    "latency_ms": 9848
+  },
+  {
+    "ts": "2026-09-24T10:00:48Z",
+    "level": "ERROR",
+    "service": "payments-gateway-eu-west-1",
+    "message": "Connection to upstream payment provider timed out after 30000ms",
+    "latency_ms": 18658
+  },
+  {
+    "ts": "2026-09-24T10:00:49Z",
+    "level": "INFO",
+    "service": "orders-api-eu-central-1",
+    "message": "User session expired; redirecting to the login page",
+    "latency_ms": 10163
+  },
+  {
+    "ts": "2026-09-24T10:00:50Z",
+    "level": "INFO",
+    "service": "payments-gateway-eu-west-1",
+    "message": "Rate limit exceeded for API key; request rejected with 429",
+    "latency_ms": 7826
+  },
+  {
+    "ts": "2026-09-24T10:00:51Z",
+    "level": "ERROR",
+    "service": "payments-gateway-eu-west-1",
+    "message": "Database replica lag above threshold, falling back to primary",
+    "latency_ms": 21289
+  },
+  {
+    "ts": "2026-09-24T10:00:52Z",
+    "level": "INFO",
+    "service": "payments-gateway-eu-west-1",
+    "message": "Connection to upstream payment provider timed out after 30000ms",
+    "latency_ms": 19689
+  },
+  {
+    "ts": "2026-09-24T10:00:53Z",
+    "level": "ERROR",
+    "service": "auth-service-eu-west-1",
+    "message": "User session expired; redirecting to the login page",
+    "latency_ms": 14371
+  },
+  {
+    "ts": "2026-09-24T10:00:54Z",
+    "level": "WARN",
+    "service": "payments-gateway-eu-west-1",
+    "message": "Rate limit exceeded for API key; request rejected with 429",
+    "latency_ms": 24321
+  },
+  {
+    "ts": "2026-09-24T10:00:55Z",
+    "level": "INFO",
+    "service": "payments-gateway-eu-west-1",
+    "message": "Database replica lag above threshold, falling back to primary",
+    "latency_ms": 8872
+  },
+  {
+    "ts": "2026-09-24T10:00:56Z",
+    "level": "WARN",
+    "service": "payments-gateway-eu-west-1",
+    "message": "Connection to upstream payment provider timed out after 30000ms",
+    "latency_ms": 17359
+  },
+  {
+    "ts": "2026-09-24T10:00:57Z",
+    "level": "WARN",
+    "service": "auth-service-eu-west-1",
+    "message": "User session expired; redirecting to the login page",
+    "latency_ms": 28307
+  },
+  {
+    "ts": "2026-09-24T10:00:58Z",
+    "level": "ERROR",
+    "service": "auth-service-eu-west-1",
+    "message": "Connection to upstream payment provider timed out after 30000ms",
+    "latency_ms": 26424
+  },
+  {
+    "ts": "2026-09-24T10:00:59Z",
+    "level": "INFO",
+    "service": "auth-service-eu-west-1",
+    "message": "User session expired; redirecting to the login page",
+    "latency_ms": 13809
+  },
+  {
+    "ts": "2026-09-24T10:01:00Z",
+    "level": "ERROR",
+    "service": "orders-api-eu-central-1",
+    "message": "Rate limit exceeded for API key; request rejected with 429",
+    "latency_ms": 15232
+  },
+  {
+    "ts": "2026-09-24T10:01:01Z",
+    "level": "ERROR",
+    "service": "orders-api-eu-central-1",
+    "message": "Database replica lag above threshold, falling back to primary",
+    "latency_ms": 9520
+  },
+  {
+    "ts": "2026-09-24T10:01:02Z",
+    "level": "ERROR",
+    "service": "orders-api-eu-central-1",
+    "message": "Database replica lag above threshold, falling back to primary",
+    "latency_ms": 1169
+  },
+  {
+    "ts": "2026-09-24T10:01:03Z",
+    "level": "ERROR",
+    "service": "payments-gateway-eu-west-1",
+    "message": "User session expired; redirecting to the login page",
+    "latency_ms": 157
+  },
+  {
+    "ts": "2026-09-24T10:01:04Z",
+    "level": "ERROR",
+    "service": "orders-api-eu-central-1",
+    "message": "Database replica lag above threshold, falling back to primary",
+    "latency_ms": 18318
+  },
+  {
+    "ts": "2026-09-24T10:01:05Z",
+    "level": "INFO",
+    "service": "payments-gateway-eu-west-1",
+    "message": "Connection to upstream payment provider timed out after 30000ms",
+    "latency_ms": 24434
+  },
+  {
+    "ts": "2026-09-24T10:01:06Z",
+    "level": "ERROR",
+    "service": "orders-api-eu-central-1",
+    "message": "Rate limit exceeded for API key; request rejected with 429",
+    "latency_ms": 17826
+  },
+  {
+    "ts": "2026-09-24T10:01:07Z",
+    "level": "ERROR",
+    "service": "payments-gateway-eu-west-1",
+    "message": "Connection to upstream payment provider timed out after 30000ms",
+    "latency_ms": 28119
+  },
+  {
+    "ts": "2026-09-24T10:01:08Z",
+    "level": "INFO",
+    "service": "auth-service-eu-west-1",
+    "message": "Connection to upstream payment provider timed out after 30000ms",
+    "latency_ms": 26553
+  },
+  {
+    "ts": "2026-09-24T10:01:09Z",
+    "level": "WARN",
+    "service": "payments-gateway-eu-west-1",
+    "message": "Connection to upstream payment provider timed out after 30000ms",
+    "latency_ms": 29614
+  },
+  {
+    "ts": "2026-09-24T10:01:10Z",
+    "level": "INFO",
+    "service": "orders-api-eu-central-1",
+    "message": "User session expired; redirecting to the login page",
+    "latency_ms": 29383
+  },
+  {
+    "ts": "2026-09-24T10:01:11Z",
+    "level": "ERROR",
+    "service": "orders-api-eu-central-1",
+    "message": "Connection to upstream payment provider timed out after 30000ms",
+    "latency_ms": 435
+  },
+  {
+    "ts": "2026-09-24T10:01:12Z",
+    "level": "ERROR",
+    "service": "orders-api-eu-central-1",
+    "message": "Connection to upstream payment provider timed out after 30000ms",
+    "latency_ms": 5635
+  },
+  {
+    "ts": "2026-09-24T10:01:13Z",
+    "level": "INFO",
+    "service": "auth-service-eu-west-1",
+    "message": "User session expired; redirecting to the login page",
+    "latency_ms": 21726
+  },
+  {
+    "ts": "2026-09-24T10:01:14Z",
+    "level": "WARN",
+    "service": "orders-api-eu-central-1",
+    "message": "Database replica lag above threshold, falling back to primary",
+    "latency_ms": 1749
+  },
+  {
+    "ts": "2026-09-24T10:01:15Z",
+    "level": "INFO",
+    "service": "payments-gateway-eu-west-1",
+    "message": "Rate limit exceeded for API key; request rejected with 429",
+    "latency_ms": 4114
+  },
+  {
+    "ts": "2026-09-24T10:01:16Z",
+    "level": "ERROR",
+    "service": "orders-api-eu-central-1",
+    "message": "Database replica lag above threshold, falling back to primary",
+    "latency_ms": 26597
+  },
+  {
+    "ts": "2026-09-24T10:01:17Z",
+    "level": "WARN",
+    "service": "auth-service-eu-west-1",
+    "message": "User session expired; redirecting to the login page",
+    "latency_ms": 6471
+  },
+  {
+    "ts": "2026-09-24T10:01:18Z",
+    "level": "WARN",
+    "service": "orders-api-eu-central-1",
+    "message": "Connection to upstream payment provider timed out after 30000ms",
+    "latency_ms": 5618
+  },
+  {
+    "ts": "2026-09-24T10:01:19Z",
+    "level": "WARN",
+    "service": "auth-service-eu-west-1",
+    "message": "User session expired; redirecting to the login page",
+    "latency_ms": 26989
+  }
+]

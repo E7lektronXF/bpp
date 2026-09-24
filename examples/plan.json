@@ -1,0 +1,258 @@
+{
+  "title": "Mobil ödeme özelliğinin yayına alınması",
+  "goal": "Q3 sonuna kadar iOS ve Android uygulamalarında kartla ve cüzdanla ödeme.",
+  "steps": [
+    {
+      "id": "1",
+      "title": "Gereksinim analizi",
+      "status": "done",
+      "priority": "P1",
+      "deps": [],
+      "owner": "Ayşe",
+      "steps": [
+        {
+          "id": "1.1",
+          "title": "Paydaş görüşmeleri",
+          "status": "done",
+          "priority": "P1",
+          "deps": []
+        },
+        {
+          "id": "1.2",
+          "title": "Regülasyon incelemesi (BDDK, PCI-DSS)",
+          "status": "done",
+          "priority": "P0",
+          "deps": []
+        },
+        {
+          "id": "1.3",
+          "title": "Kabul kriterlerinin yazılması",
+          "status": "done",
+          "priority": "P1",
+          "deps": [
+            "1.1"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "2",
+      "title": "Mimari tasarım",
+      "status": "done",
+      "priority": "P1",
+      "deps": [
+        "1"
+      ],
+      "owner": "Mehmet",
+      "steps": [
+        {
+          "id": "2.1",
+          "title": "Ödeme sağlayıcısı seçimi",
+          "status": "done",
+          "priority": "P0",
+          "deps": [],
+          "note": "Sağlayıcı A seçildi: komisyon %1.4"
+        },
+        {
+          "id": "2.2",
+          "title": "Tokenizasyon akışının tasarımı",
+          "status": "done",
+          "priority": "P0",
+          "deps": [
+            "2.1"
+          ]
+        },
+        {
+          "id": "2.3",
+          "title": "Hata ve iade senaryoları",
+          "status": "done",
+          "priority": "P1",
+          "deps": [
+            "2.2"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "3",
+      "title": "Backend geliştirme",
+      "status": "in_progress",
+      "priority": "P0",
+      "deps": [
+        "2"
+      ],
+      "owner": "Can",
+      "steps": [
+        {
+          "id": "3.1",
+          "title": "Ödeme servisi API'si",
+          "status": "done",
+          "priority": "P0",
+          "deps": []
+        },
+        {
+          "id": "3.2",
+          "title": "Webhook işleyicisi",
+          "status": "in_progress",
+          "priority": "P0",
+          "deps": [
+            "3.1"
+          ]
+        },
+        {
+          "id": "3.3",
+          "title": "İade (refund) uç noktası",
+          "status": "todo",
+          "priority": "P1",
+          "deps": [
+            "3.1"
+          ]
+        },
+        {
+          "id": "3.4",
+          "title": "Mutabakat (reconciliation) işi",
+          "status": "todo",
+          "priority": "P1",
+          "deps": [
+            "3.2"
+          ],
+          "note": "Gece 02:00'de çalışır; farklar Slack #odeme-alarm kanalına"
+        }
+      ]
+    },
+    {
+      "id": "4",
+      "title": "Mobil istemci",
+      "status": "in_progress",
+      "priority": "P0",
+      "deps": [
+        "2"
+      ],
+      "owner": "Zeynep",
+      "steps": [
+        {
+          "id": "4.1",
+          "title": "iOS: Apple Pay entegrasyonu",
+          "status": "in_progress",
+          "priority": "P0",
+          "deps": [
+            "3.1"
+          ]
+        },
+        {
+          "id": "4.2",
+          "title": "Android: Google Pay entegrasyonu",
+          "status": "todo",
+          "priority": "P0",
+          "deps": [
+            "3.1"
+          ]
+        },
+        {
+          "id": "4.3",
+          "title": "Kart formu ve 3-D Secure ekranı",
+          "status": "in_progress",
+          "priority": "P0",
+          "deps": [
+            "3.1"
+          ]
+        },
+        {
+          "id": "4.4",
+          "title": "Hata mesajlarının yerelleştirilmesi (tr, en, de)",
+          "status": "todo",
+          "priority": "P2",
+          "deps": [
+            "4.3"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "5",
+      "title": "Test",
+      "status": "todo",
+      "priority": "P0",
+      "deps": [
+        "3",
+        "4"
+      ],
+      "owner": "Elif",
+      "steps": [
+        {
+          "id": "5.1",
+          "title": "Birim testleri (%80 kapsama)",
+          "status": "in_progress",
+          "priority": "P1",
+          "deps": []
+        },
+        {
+          "id": "5.2",
+          "title": "Sağlayıcı sandbox ile uçtan uca test",
+          "status": "todo",
+          "priority": "P0",
+          "deps": [
+            "3.2",
+            "4.3"
+          ]
+        },
+        {
+          "id": "5.3",
+          "title": "Yük testi: 200 işlem/sn",
+          "status": "todo",
+          "priority": "P1",
+          "deps": [
+            "3.4"
+          ]
+        },
+        {
+          "id": "5.4",
+          "title": "Güvenlik testi (pentest)",
+          "status": "todo",
+          "priority": "P0",
+          "deps": [
+            "5.2"
+          ],
+          "owner": "Harici firma"
+        }
+      ]
+    },
+    {
+      "id": "6",
+      "title": "Yayın",
+      "status": "todo",
+      "priority": "P0",
+      "deps": [
+        "5"
+      ],
+      "owner": "Oğuz",
+      "steps": [
+        {
+          "id": "6.1",
+          "title": "Kademeli açılış: %5 → %25 → %100",
+          "status": "todo",
+          "priority": "P0",
+          "deps": [
+            "5.4"
+          ]
+        },
+        {
+          "id": "6.2",
+          "title": "İzleme panoları ve alarmlar",
+          "status": "todo",
+          "priority": "P1",
+          "deps": [
+            "3.4"
+          ]
+        },
+        {
+          "id": "6.3",
+          "title": "Destek ekibi eğitimi",
+          "status": "todo",
+          "priority": "P2",
+          "deps": []
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,71 @@
+service:
+  name: order-api
+  version: 2.4.1
+  environment: production
+  debug: false
+  replicas: 3
+server:
+  host: 0.0.0.0
+  port: 8080
+  timeouts:
+    read_ms: 5000
+    write_ms: 10000
+    idle_ms: 60000
+  tls:
+    enabled: true
+    cert_path: /etc/ssl/certs/order-api.pem
+    key_path: /etc/ssl/private/order-api.key
+    min_version: '1.2'
+database:
+  primary:
+    host: db-primary.internal
+    port: 5432
+    name: orders
+    user: order_svc
+    pool:
+      min: 5
+      max: 50
+      idle_timeout_s: 300
+  replicas:
+  - host: db-replica-1.internal
+    port: 5432
+    weight: 2
+  - host: db-replica-2.internal
+    port: 5432
+    weight: 1
+cache:
+  backend: redis
+  url: redis://cache.internal:6379/0
+  ttl_s: 900
+  key_prefix: 'order-api:'
+logging:
+  level: info
+  format: json
+  sinks:
+  - stdout
+  - file
+  file:
+    path: /var/log/order-api/app.log
+    rotate_mb: 100
+    keep: 7
+features:
+  new_checkout: true
+  fraud_scoring: true
+  gift_cards: false
+  beta_regions:
+  - TR
+  - DE
+  - NL
+rate_limits:
+- route: /v1/orders
+  method: POST
+  per_minute: 600
+- route: /v1/orders
+  method: GET
+  per_minute: 3000
+- route: /v1/orders/{id}/cancel
+  method: POST
+  per_minute: 60
+owners:
+- platform-team@example.com
+- oncall-orders@example.com

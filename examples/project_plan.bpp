@@ -1,0 +1,48 @@
+bpp1
+title Veri platformu göçü — 2026 H2
+note "Eski Hadoop kümesinden bulut tabanlı lakehouse mimarisine geçiş planı. Sahibi: Veri Platformu ekibi.\nHedef tarih: 15 Aralık 2026. Bütçe: 420.000 €."
+steps[5]{status? note? title}>steps
+Keşif ve envanter
+ status=done note="Toplam 312 Airflow DAG'i, 48 Spark işi ve 17 Hive veritabanı tespit edildi." Mevcut iş akışlarının envanteri
+ status=done Veri sahipleriyle görüşmeler
+  status=done Pazarlama analitiği
+  status=done Finans raporlama
+  status=done Ürün analitiği
+  status=todo note="KVKK kapsamındaki tablolar için ayrı onay gerekiyor." Hukuk ve uyum
+ status=done note="Mevcut küme aylık 38.000 €; hedef mimari tahmini aylık 21.500 €." Maliyet modeli
+ status=doing note="DAG'ler arası bağımlılıkların %70'i otomatik çıkarıldı, kalanı elle." Bağımlılık grafiğinin çıkarılması
+Mimari
+ status=done note="Iceberg seçildi: çoklu motor desteği ve gizli bölümleme." Depolama formatı seçimi (Iceberg vs Delta)
+ status=done Katalog: AWS Glue yerine Nessie
+ status=doing Ağ ve güvenlik tasarımı
+  status=done VPC ve özel uç noktalar
+  status=doing IAM rol modeli
+  status=todo Şifreleme anahtarlarının rotasyonu
+ status=todo note="RPO 1 saat, RTO 4 saat. Bölgeler arası kopya: eu-central-1 → eu-west-1." Felaket kurtarma planı
+Göç dalgaları
+ Dalga 1 — düşük riskli tablolar
+  status=done 120 boyut tablosunun kopyalanması
+  status=done note="```sql\nSELECT count(*), sum(hash(*)) FROM eski.tablo\nEXCEPT\nSELECT count(*), sum(hash(*)) FROM yeni.tablo;\n```" Doğrulama betikleri
+  status=done Okuyucuların yeni kataloğa yönlendirilmesi
+ Dalga 2 — olay tabloları
+  status=doing note="Bölümleme: gün + ülke kodu. Tahmini süre 3 hafta." Günlük olay tablolarının yeniden bölümlenmesi
+  status=todo Geçmiş verinin (2019–2023) arşiv katmanına taşınması
+  status=todo Akış işlerinin (Kafka → Iceberg) devreye alınması
+   status=todo Şema kayıt defteri entegrasyonu
+   status=todo Tam olarak bir kez (exactly-once) yazım testi
+ Dalga 3 — finans ve uyum
+  status=todo note="Ay sonu kapanışı sırasında göç yapılmayacak (her ayın son 3 iş günü)." Finans tablolarının göçü
+  status=todo Hukuk onayı
+  status=cancelled note="İptal: sunucu Ocak'ta tamamen kapatılacak." Eski raporlama sunucusunun taşınması
+Doğrulama ve performans
+ status=todo Sorgu performansı karşılaştırması (en yoğun 50 sorgu)
+ status=todo Maliyet izleme panoları
+ status=todo Veri kalitesi kuralları (Great Expectations)
+  status=todo Boş değer oranları
+  status=todo Benzersizlik kısıtları
+  status=todo Referans bütünlüğü
+Kapanış
+ status=todo Eski kümenin salt okunur moda alınması
+ status=todo Eski kümenin kapatılması
+ status=todo Ekip eğitimi ve dokümantasyon
+ status=todo Proje retrospektifi

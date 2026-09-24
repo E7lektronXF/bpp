@@ -1,7 +1,8 @@
 # .bpp — Format Spesifikasyonu (sürüm `bpp1`)
 
-> Durum: **taslak v1** (Aşama 1). Her karar `bench/experiments.py` ile ölçüldü; ham sonuçlar
-> `bench/results/experiments.md`'de. Aşama 4 benchmark'ı sonrasında revize edilecek.
+> Durum: **v1** (`bpp1`). Her karar `bench/experiments.py` ile ölçüldü; ham sonuçlar
+> `bench/results/experiments.md`'de. Benchmark sonuçları ve `bpp2` için revizyon önerileri (R1–R5):
+> [BENCHMARK.md](BENCHMARK.md) §5.
 
 ## 0. Amaç ve ilkeler
 
@@ -290,20 +291,24 @@ Markdown girişinde: başlıklar (`#`, `##`, …) ve iç içe listeler ağaca ç
 Formatı hiç görmemiş bir LLM için dosyanın başına `#` yorum satırı olarak eklenebilir
 (`bpp encode --primer`). Decoder yok sayar.
 
-**1 satır (o200k 38 / claude2 39 token):**
+**1 satır (o200k 60 / claude2 63 token):**
 ```
-# bpp1: JSON as indented 'key value' lines; k[N]{a,b} = N CSV rows; "..." = JSON string; *n = &n.
-```
-
-**3 satır (96 / 103 token):**
-```
-# bpp1 = JSON data. Lines are 'key value'; a bare 'key' opens a nested object (1-space indent).
-# k[N]{a,b}: N rows of comma values for a,b. k[N]{a b? c}>kids: space rows, last col = rest of line,
-# optional col as a=v, indented rows are kids. '- ' = list item. "..." = JSON string. *n = &n value.
+# bpp1: JSON as 'key value' lines, 1-space indent nests. k[N]{a b}: N rows of values in column order, last column = rest of line, x? columns appear as x=v. "..." = JSON string, *n = &n.
 ```
 
-Primer sabit maliyettir: 60 satırlık tabloda (~2200 token) %2, küçük bir config'te (~330 token)
-%11–29. Varsayılan **kapalı**; Aşama 4'te anlama testinin primer'li/primer'siz karşılaştırması
+**3 satır (107 / 115 token):**
+```
+# bpp1 = JSON data. Lines are 'key value'; a bare 'key' opens a nested object (1-space indent). [a,b] = list.
+# k[N]{a b c}: N rows, values space-separated in column order, last column = rest of line;
+# x? = optional, written x=v; >kids: indented rows are kids. {a,b}: comma rows. k[N]: N '- ' items. "..." = JSON string. *n = &n value.
+```
+
+> Aşama 4 revizyonu: Aşama 1'deki primer "k[N]{a,b} = N CSV rows" diyordu; Aşama 2'de satır
+> tablosu varsayılan olunca primer gerçek sözdizimini anlatacak şekilde yeniden yazıldı
+> (38 → 60 token).
+
+Primer sabit maliyettir: 60 satırlık tabloda (~2050 token) %2–3, küçük bir config'te (~330 token)
+%12–35. Varsayılan **kapalı**; Aşama 4'te anlama testinin primer'li/primer'siz karşılaştırması
 yapılacak.
 
 ## 9. Kayıpsızlık tanımı

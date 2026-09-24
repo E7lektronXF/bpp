@@ -8,12 +8,14 @@ from .estimate import est_tokens
 from .lexer import NUM_RE, Ref, fmt_inline, fmt_key, fmt_scalar, is_scalar, jstr
 
 HEADER = "bpp1"
-PRIMER = ("# bpp1: JSON as indented 'key value' lines; k[N]{a,b} = N CSV rows; "
-          "\"...\" = JSON string; *n = &n.")
+PRIMER = ("# bpp1: JSON as 'key value' lines, 1-space indent nests. k[N]{a b}: N rows of values "
+          "in column order, last column = rest of line, x? columns appear as x=v. "
+          "\"...\" = JSON string, *n = &n.")
 PRIMER_LONG = (
-    "# bpp1 = JSON data. Lines are 'key value'; a bare 'key' opens a nested object (1-space indent).\n"
-    "# k[N]{a,b}: N rows of comma values for a,b. k[N]{a b? c}>kids: space rows, last col = rest of line,\n"
-    "# optional col as a=v, indented rows are kids. '- ' = list item. \"...\" = JSON string. *n = &n value."
+    "# bpp1 = JSON data. Lines are 'key value'; a bare 'key' opens a nested object (1-space indent). [a,b] = list.\n"
+    "# k[N]{a b c}: N rows, values space-separated in column order, last column = rest of line;\n"
+    "# x? = optional, written x=v; >kids: indented rows are kids. {a,b}: comma rows. k[N]: N '- ' items. "
+    "\"...\" = JSON string. *n = &n value."
 )
 CHILD_KEYS = ("steps", "children", "subtasks", "tasks", "items", "nodes")
 MIN_REF_LEN = 8

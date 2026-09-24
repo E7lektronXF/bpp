@@ -1,0 +1,512 @@
+{
+  "request_id": "req_8f3a2c",
+  "generated_at": "2026-09-24T10:15:00Z",
+  "page": {
+    "number": 1,
+    "size": 20,
+    "total_pages": 7
+  },
+  "summary": "Son 30 günün siparişleri. İptal oranı %4.2; en çok satan ürün kulaklık.",
+  "orders": [
+    {
+      "order_id": "ORD-2026-00001",
+      "customer": {
+        "name": "Ayşe Arslan",
+        "city": "Ankara"
+      },
+      "status": "paid",
+      "shipping_method": "standard",
+      "items": [
+        {
+          "sku": "SKU-254",
+          "name": "27\" Monitör",
+          "qty": 3,
+          "unit_price": 335.6
+        },
+        {
+          "sku": "SKU-940",
+          "name": "Laptop Standı",
+          "qty": 1,
+          "unit_price": 1890.88
+        }
+      ],
+      "total": 2897.68,
+      "note": "Fatura: şirket adına, \"ACME Ltd. Şti.\""
+    },
+    {
+      "order_id": "ORD-2026-00002",
+      "customer": {
+        "name": "Wei Yılmaz",
+        "city": "Eskişehir"
+      },
+      "status": "cancelled",
+      "shipping_method": "standard",
+      "items": [
+        {
+          "sku": "SKU-171",
+          "name": "USB-C Şarj Aleti",
+          "qty": 1,
+          "unit_price": 2799.13
+        },
+        {
+          "sku": "SKU-160",
+          "name": "Laptop Standı",
+          "qty": 1,
+          "unit_price": 4741.5
+        }
+      ],
+      "total": 7540.63,
+      "note": null
+    },
+    {
+      "order_id": "ORD-2026-00003",
+      "customer": {
+        "name": "Maria Kaya",
+        "city": "Eskişehir"
+      },
+      "status": "delivered",
+      "shipping_method": "standard",
+      "items": [
+        {
+          "sku": "SKU-670",
+          "name": "USB-C Şarj Aleti",
+          "qty": 2,
+          "unit_price": 2152.78
+        }
+      ],
+      "total": 4305.56,
+      "note": null
+    },
+    {
+      "order_id": "ORD-2026-00004",
+      "customer": {
+        "name": "Özlem Chen",
+        "city": "İzmir"
+      },
+      "status": "cancelled",
+      "shipping_method": "express",
+      "items": [
+        {
+          "sku": "SKU-684",
+          "name": "Webcam 1080p",
+          "qty": 1,
+          "unit_price": 1923.75
+        },
+        {
+          "sku": "SKU-660",
+          "name": "Webcam 1080p",
+          "qty": 1,
+          "unit_price": 2864.4
+        },
+        {
+          "sku": "SKU-733",
+          "name": "USB-C Şarj Aleti",
+          "qty": 2,
+          "unit_price": 3432.96
+        }
+      ],
+      "total": 11654.07,
+      "note": "Kapıya bırakın, zili çalmayın."
+    },
+    {
+      "order_id": "ORD-2026-00005",
+      "customer": {
+        "name": "Oğuz Garcia",
+        "city": "Bursa"
+      },
+      "status": "delivered",
+      "shipping_method": "standard",
+      "items": [
+        {
+          "sku": "SKU-354",
+          "name": "USB-C Şarj Aleti",
+          "qty": 3,
+          "unit_price": 3920.17
+        },
+        {
+          "sku": "SKU-183",
+          "name": "Laptop Standı",
+          "qty": 2,
+          "unit_price": 2672.46
+        }
+      ],
+      "total": 17105.43,
+      "note": null
+    },
+    {
+      "order_id": "ORD-2026-00006",
+      "customer": {
+        "name": "Oğuz Yıldız",
+        "city": "Berlin"
+      },
+      "status": "delivered",
+      "shipping_method": "express",
+      "items": [
+        {
+          "sku": "SKU-528",
+          "name": "USB-C Şarj Aleti",
+          "qty": 2,
+          "unit_price": 843.72
+        },
+        {
+          "sku": "SKU-600",
+          "name": "27\" Monitör",
+          "qty": 1,
+          "unit_price": 4812.89
+        },
+        {
+          "sku": "SKU-179",
+          "name": "Laptop Standı",
+          "qty": 3,
+          "unit_price": 3965.56
+        }
+      ],
+      "total": 18397.01,
+      "note": "Line one\nLine two"
+    },
+    {
+      "order_id": "ORD-2026-00007",
+      "customer": {
+        "name": "Gül Smith",
+        "city": "Eskişehir"
+      },
+      "status": "cancelled",
+      "shipping_method": "express",
+      "items": [
+        {
+          "sku": "SKU-170",
+          "name": "Kablosuz Kulaklık",
+          "qty": 2,
+          "unit_price": 2422.08
+        },
+        {
+          "sku": "SKU-780",
+          "name": "Kablosuz Kulaklık",
+          "qty": 1,
+          "unit_price": 3681.68
+        }
+      ],
+      "total": 8525.84,
+      "note": "Fatura: şirket adına, \"ACME Ltd. Şti.\""
+    },
+    {
+      "order_id": "ORD-2026-00008",
+      "customer": {
+        "name": "Emre Öztürk",
+        "city": "London"
+      },
+      "status": "cancelled",
+      "shipping_method": "standard",
+      "items": [
+        {
+          "sku": "SKU-455",
+          "name": "Kablosuz Kulaklık",
+          "qty": 2,
+          "unit_price": 1840.77
+        },
+        {
+          "sku": "SKU-725",
+          "name": "Kablosuz Kulaklık",
+          "qty": 2,
+          "unit_price": 387.88
+        },
+        {
+          "sku": "SKU-886",
+          "name": "Mekanik Klavye",
+          "qty": 1,
+          "unit_price": 3716.98
+        }
+      ],
+      "total": 8174.28,
+      "note": null
+    },
+    {
+      "order_id": "ORD-2026-00009",
+      "customer": {
+        "name": "Özlem Yıldız",
+        "city": "Berlin"
+      },
+      "status": "cancelled",
+      "shipping_method": "standard",
+      "items": [
+        {
+          "sku": "SKU-511",
+          "name": "Laptop Standı",
+          "qty": 2,
+          "unit_price": 4427.58
+        },
+        {
+          "sku": "SKU-938",
+          "name": "27\" Monitör",
+          "qty": 3,
+          "unit_price": 1463.26
+        }
+      ],
+      "total": 13244.94,
+      "note": null
+    },
+    {
+      "order_id": "ORD-2026-00010",
+      "customer": {
+        "name": "Ahmet Aydın",
+        "city": "London"
+      },
+      "status": "shipped",
+      "shipping_method": "express",
+      "items": [
+        {
+          "sku": "SKU-280",
+          "name": "USB-C Şarj Aleti",
+          "qty": 1,
+          "unit_price": 3325.73
+        }
+      ],
+      "total": 3325.73,
+      "note": "Kapıya bırakın, zili çalmayın."
+    },
+    {
+      "order_id": "ORD-2026-00011",
+      "customer": {
+        "name": "Wei Yıldız",
+        "city": "Ankara"
+      },
+      "status": "paid",
+      "shipping_method": "express",
+      "items": [
+        {
+          "sku": "SKU-249",
+          "name": "27\" Monitör",
+          "qty": 3,
+          "unit_price": 1908.34
+        }
+      ],
+      "total": 5725.02,
+      "note": "Line one\nLine two"
+    },
+    {
+      "order_id": "ORD-2026-00012",
+      "customer": {
+        "name": "Can Aydın",
+        "city": "Ankara"
+      },
+      "status": "paid",
+      "shipping_method": "express",
+      "items": [
+        {
+          "sku": "SKU-507",
+          "name": "27\" Monitör",
+          "qty": 2,
+          "unit_price": 606.33
+        },
+        {
+          "sku": "SKU-749",
+          "name": "27\" Monitör",
+          "qty": 1,
+          "unit_price": 1032.99
+        }
+      ],
+      "total": 2245.65,
+      "note": "Line one\nLine two"
+    },
+    {
+      "order_id": "ORD-2026-00013",
+      "customer": {
+        "name": "Zeynep Yıldız",
+        "city": "Eskişehir"
+      },
+      "status": "paid",
+      "shipping_method": "standard",
+      "items": [
+        {
+          "sku": "SKU-204",
+          "name": "Kablosuz Kulaklık",
+          "qty": 3,
+          "unit_price": 840.2
+        }
+      ],
+      "total": 2520.6,
+      "note": null
+    },
+    {
+      "order_id": "ORD-2026-00014",
+      "customer": {
+        "name": "Gül Kaya",
+        "city": "Ankara"
+      },
+      "status": "paid",
+      "shipping_method": "express",
+      "items": [
+        {
+          "sku": "SKU-485",
+          "name": "USB-C Şarj Aleti",
+          "qty": 3,
+          "unit_price": 1335.06
+        },
+        {
+          "sku": "SKU-455",
+          "name": "Laptop Standı",
+          "qty": 2,
+          "unit_price": 2422.34
+        },
+        {
+          "sku": "SKU-218",
+          "name": "27\" Monitör",
+          "qty": 2,
+          "unit_price": 2452.94
+        }
+      ],
+      "total": 13755.74,
+      "note": "Kapıya bırakın, zili çalmayın."
+    },
+    {
+      "order_id": "ORD-2026-00015",
+      "customer": {
+        "name": "Maria Yılmaz",
+        "city": "London"
+      },
+      "status": "delivered",
+      "shipping_method": "standard",
+      "items": [
+        {
+          "sku": "SKU-948",
+          "name": "Webcam 1080p",
+          "qty": 1,
+          "unit_price": 2629.04
+        },
+        {
+          "sku": "SKU-310",
+          "name": "Laptop Standı",
+          "qty": 2,
+          "unit_price": 817.35
+        }
+      ],
+      "total": 4263.74,
+      "note": "Kapıya bırakın, zili çalmayın."
+    },
+    {
+      "order_id": "ORD-2026-00016",
+      "customer": {
+        "name": "Emre Garcia",
+        "city": "London"
+      },
+      "status": "shipped",
+      "shipping_method": "standard",
+      "items": [
+        {
+          "sku": "SKU-475",
+          "name": "USB-C Şarj Aleti",
+          "qty": 2,
+          "unit_price": 3881.5
+        },
+        {
+          "sku": "SKU-645",
+          "name": "Laptop Standı",
+          "qty": 3,
+          "unit_price": 1714.36
+        },
+        {
+          "sku": "SKU-328",
+          "name": "Laptop Standı",
+          "qty": 1,
+          "unit_price": 4048.79
+        }
+      ],
+      "total": 16954.87,
+      "note": "Line one\nLine two"
+    },
+    {
+      "order_id": "ORD-2026-00017",
+      "customer": {
+        "name": "Priya Yıldız",
+        "city": "Bursa"
+      },
+      "status": "delivered",
+      "shipping_method": "express",
+      "items": [
+        {
+          "sku": "SKU-464",
+          "name": "Webcam 1080p",
+          "qty": 1,
+          "unit_price": 4948.06
+        },
+        {
+          "sku": "SKU-909",
+          "name": "Mekanik Klavye",
+          "qty": 2,
+          "unit_price": 1368.95
+        }
+      ],
+      "total": 7685.96,
+      "note": null
+    },
+    {
+      "order_id": "ORD-2026-00018",
+      "customer": {
+        "name": "Can Aydın",
+        "city": "Eskişehir"
+      },
+      "status": "paid",
+      "shipping_method": "express",
+      "items": [
+        {
+          "sku": "SKU-204",
+          "name": "USB-C Şarj Aleti",
+          "qty": 2,
+          "unit_price": 1062.86
+        }
+      ],
+      "total": 2125.72,
+      "note": "Kapıya bırakın, zili çalmayın."
+    },
+    {
+      "order_id": "ORD-2026-00019",
+      "customer": {
+        "name": "Emre Aydın",
+        "city": "Bursa"
+      },
+      "status": "paid",
+      "shipping_method": "standard",
+      "items": [
+        {
+          "sku": "SKU-186",
+          "name": "Webcam 1080p",
+          "qty": 1,
+          "unit_price": 4556.91
+        },
+        {
+          "sku": "SKU-901",
+          "name": "Webcam 1080p",
+          "qty": 1,
+          "unit_price": 2441.36
+        },
+        {
+          "sku": "SKU-282",
+          "name": "27\" Monitör",
+          "qty": 3,
+          "unit_price": 1728.33
+        }
+      ],
+      "total": 12183.26,
+      "note": null
+    },
+    {
+      "order_id": "ORD-2026-00020",
+      "customer": {
+        "name": "Mustafa Doğan",
+        "city": "London"
+      },
+      "status": "cancelled",
+      "shipping_method": "express",
+      "items": [
+        {
+          "sku": "SKU-128",
+          "name": "USB-C Şarj Aleti",
+          "qty": 3,
+          "unit_price": 4532.78
+        }
+      ],
+      "total": 13598.34,
+      "note": null
+    }
+  ]
+}

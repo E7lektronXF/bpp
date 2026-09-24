@@ -1,0 +1,31 @@
+bpp1
+title Mobil ödeme özelliğinin yayına alınması
+goal Q3 sonuna kadar iOS ve Android uygulamalarında kartla ve cüzdanla ödeme.
+steps[6]{id:str status priority deps:str owner? note? title}>steps
+1 done P1 [] owner=Ayşe Gereksinim analizi
+ 1.1 done P1 [] Paydaş görüşmeleri
+ 1.2 done P0 [] Regülasyon incelemesi (BDDK, PCI-DSS)
+ 1.3 done P1 [1.1] Kabul kriterlerinin yazılması
+2 done P1 [1] owner=Mehmet Mimari tasarım
+ 2.1 done P0 [] note="Sağlayıcı A seçildi: komisyon %1.4" Ödeme sağlayıcısı seçimi
+ 2.2 done P0 [2.1] Tokenizasyon akışının tasarımı
+ 2.3 done P1 [2.2] Hata ve iade senaryoları
+3 in_progress P0 [2] owner=Can Backend geliştirme
+ 3.1 done P0 [] Ödeme servisi API'si
+ 3.2 in_progress P0 [3.1] Webhook işleyicisi
+ 3.3 todo P1 [3.1] İade (refund) uç noktası
+ 3.4 todo P1 [3.2] note="Gece 02:00'de çalışır; farklar Slack #odeme-alarm kanalına" Mutabakat (reconciliation) işi
+4 in_progress P0 [2] owner=Zeynep Mobil istemci
+ 4.1 in_progress P0 [3.1] iOS: Apple Pay entegrasyonu
+ 4.2 todo P0 [3.1] Android: Google Pay entegrasyonu
+ 4.3 in_progress P0 [3.1] Kart formu ve 3-D Secure ekranı
+ 4.4 todo P2 [4.3] Hata mesajlarının yerelleştirilmesi (tr, en, de)
+5 todo P0 [3,4] owner=Elif Test
+ 5.1 in_progress P1 [] Birim testleri (%80 kapsama)
+ 5.2 todo P0 [3.2,4.3] Sağlayıcı sandbox ile uçtan uca test
+ 5.3 todo P1 [3.4] Yük testi: 200 işlem/sn
+ 5.4 todo P0 [5.2] owner="Harici firma" Güvenlik testi (pentest)
+6 todo P0 [5] owner=Oğuz Yayın
+ 6.1 todo P0 [5.4] Kademeli açılış: %5 → %25 → %100
+ 6.2 todo P1 [3.4] İzleme panoları ve alarmlar
+ 6.3 todo P2 [] Destek ekibi eğitimi

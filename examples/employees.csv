@@ -1,0 +1,61 @@
+id,name,email,department,city,salary,rating,active,manager_id,start_date
+1,Mustafa Doğan,mustafa.dogan@example.com,Engineering,İzmir,45000,3.0,true,,2022-04-04
+2,Ümran Yılmaz,umran.yilmaz@example.com,Finance,Bursa,107500,4.0,false,,2024-05-24
+3,Şule Doğan,sule.dogan@example.com,Engineering,İzmir,33500,1.1,true,,2010-07-22
+4,Can Öztürk,can.ozturk@example.com,Operations,İstanbul,97500,1.9,true,2,2017-06-08
+5,Şule Chen,sule.chen@example.com,Finance,İzmir,148500,1.1,true,3,2013-03-21
+6,Gül Kaya,gul.kaya@example.com,Operations,İzmir,144500,3.9,true,2,2016-05-10
+7,Wei Aydın,wei.aydin@example.com,Human Resources,Bursa,105000,4.4,true,3,2022-07-22
+8,Elif Yıldız,elif.yildiz@example.com,Human Resources,Berlin,129000,3.7,true,2,2013-03-17
+9,Emre Yıldız,emre.yildiz@example.com,Finance,Berlin,33500,2.9,true,3,2022-11-06
+10,Elif Arslan,elif.arslan@example.com,Sales,İstanbul,128500,1.8,true,3,2017-07-17
+11,Çiğdem Patel,cigdem.patel@example.com,Human Resources,İzmir,88500,4.6,true,3,2010-07-26
+12,John Chen,john.chen@example.com,Sales,Eskişehir,129500,3.2,true,1,2025-06-19
+13,Maria Şahin,maria.sahin@example.com,Human Resources,Bursa,92000,4.3,true,1,2020-08-20
+14,Ahmet Chen,ahmet.chen@example.com,Sales,Berlin,52500,3.2,false,1,2018-01-27
+15,Mehmet Kaya,mehmet.kaya@example.com,Engineering,Bursa,31500,4.0,true,2,2013-10-06
+16,Çiğdem Çelik,cigdem.celik@example.com,Engineering,Ankara,50000,2.0,true,3,2018-11-23
+17,Gül Aydın,gul.aydin@example.com,Operations,İzmir,93500,2.9,false,2,2020-07-26
+18,Can Çelik,can.celik@example.com,Engineering,İzmir,145000,3.9,true,3,2023-01-08
+19,Ahmet Öztürk,ahmet.ozturk@example.com,Sales,İstanbul,122000,4.8,true,3,2023-09-27
+20,Şule Smith,sule.smith@example.com,Operations,Eskişehir,87500,1.9,true,2,2020-11-21
+21,Özlem Yılmaz,ozlem.yilmaz@example.com,Operations,İzmir,46000,4.9,true,2,2012-02-10
+22,Gül Garcia,gul.garcia@example.com,Sales,Bursa,102000,2.0,false,1,2016-10-15
+23,Elif Patel,elif.patel@example.com,Operations,Eskişehir,95000,1.1,true,1,2016-10-22
+24,Özlem Doğan,ozlem.dogan@example.com,Sales,Bursa,43000,4.8,true,3,2025-01-11
+25,Priya Patel,priya.patel@example.com,Finance,İzmir,32000,1.6,true,3,2014-06-14
+26,Can Çelik,can.celik@example.com,Operations,İstanbul,137000,2.5,true,3,2025-09-08
+27,Mehmet Garcia,mehmet.garcia@example.com,Engineering,İstanbul,47000,1.7,true,1,2018-06-20
+28,John Patel,john.patel@example.com,Marketing,İzmir,73000,2.4,true,3,2025-03-19
+29,Maria Chen,maria.chen@example.com,Engineering,İzmir,35000,2.6,true,1,2014-06-04
+30,Priya Doğan,priya.dogan@example.com,Finance,İstanbul,103000,3.2,true,2,2021-05-19
+31,Maria Kaya,maria.kaya@example.com,Finance,İzmir,43500,4.1,true,1,2010-02-14
+32,Zeynep Patel,zeynep.patel@example.com,Engineering,Ankara,60500,4.1,true,1,2013-08-06
+33,Şule Demir,sule.demir@example.com,Operations,London,43000,2.7,true,3,2019-09-09
+34,Ümran Yıldız,umran.yildiz@example.com,Engineering,Ankara,113000,2.3,false,2,2020-08-13
+35,Oğuz Öztürk,oguz.ozturk@example.com,Engineering,İstanbul,146500,2.3,true,2,2013-05-07
+36,Priya Chen,priya.chen@example.com,Human Resources,London,118000,2.9,true,1,2016-05-07
+37,Şule Yıldız,sule.yildiz@example.com,Engineering,London,65500,1.4,true,1,2020-04-13
+38,Gül Yılmaz,gul.yilmaz@example.com,Marketing,Ankara,70500,4.2,true,2,2017-06-04
+39,Maria Doğan,maria.dogan@example.com,Human Resources,London,106000,1.4,true,1,2022-02-09
+40,Maria Patel,maria.patel@example.com,Engineering,Berlin,39500,1.1,false,2,2025-08-28
+41,Mustafa Kaya,mustafa.kaya@example.com,Human Resources,London,131500,2.3,true,3,2015-03-25
+42,Mustafa Demir,mustafa.demir@example.com,Marketing,İzmir,43500,3.8,true,3,2019-03-07
+43,Mustafa Arslan,mustafa.arslan@example.com,Operations,İstanbul,129500,2.3,true,3,2016-03-10
+44,Özlem Arslan,ozlem.arslan@example.com,Sales,İstanbul,121000,4.4,true,1,2024-07-18
+45,İsmail Arslan,ismail.arslan@example.com,Finance,London,98500,2.8,true,2,2015-05-16
+46,Ahmet Chen,ahmet.chen@example.com,Operations,Bursa,103000,1.1,true,3,2014-10-05
+47,Mustafa Çelik,mustafa.celik@example.com,Marketing,Bursa,102000,2.6,true,1,2025-01-06
+48,John Yıldız,john.yildiz@example.com,Human Resources,Berlin,147500,2.8,true,3,2017-04-11
+49,Ümran Smith,umran.smith@example.com,Finance,Ankara,121000,2.6,true,3,2018-11-08
+50,Ayşe Kaya,ayse.kaya@example.com,Human Resources,Berlin,142000,2.5,true,1,2019-05-23
+51,Gül Patel,gul.patel@example.com,Human Resources,İzmir,51000,3.8,true,3,2012-02-20
+52,John Doğan,john.dogan@example.com,Finance,Ankara,49500,2.0,true,3,2011-08-22
+53,Emre Garcia,emre.garcia@example.com,Operations,İzmir,79000,3.1,false,3,2011-09-03
+54,İsmail Smith,ismail.smith@example.com,Engineering,İzmir,124000,4.7,true,1,2012-08-28
+55,Şule Patel,sule.patel@example.com,Finance,London,145500,2.7,false,2,2024-03-20
+56,Ümran Şahin,umran.sahin@example.com,Engineering,Bursa,106500,3.1,true,3,2019-05-08
+57,Emre Garcia,emre.garcia@example.com,Human Resources,İstanbul,54000,3.1,true,1,2017-05-07
+58,Elif Çelik,elif.celik@example.com,Sales,Eskişehir,55500,2.1,true,2,2024-03-18
+59,Çiğdem Aydın,cigdem.aydin@example.com,Finance,London,45500,4.1,true,2,2016-05-26
+60,Zeynep Chen,zeynep.chen@example.com,Engineering,İstanbul,102500,4.0,true,3,2014-02-17
