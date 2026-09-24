@@ -1,4 +1,4 @@
-# bpp — LLM'e veri verirken daha az token
+# bpp — LLM'e veri verirken daha az token için yeni seçenecek
 
 `.bpp`, JSON/YAML/CSV verisini ve Markdown planlarını bir LLM'in **daha az token ile** okuyacağı
 bir metne çevirir, sonra kayıpsız geri çevirir. Örnek setlerde toplam token sayısı JSON'a göre
