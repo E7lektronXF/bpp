@@ -1,4 +1,4 @@
-bpp2
+bpp3
 title Mobil ödeme özelliğinin yayına alınması
 goal Q3 sonuna kadar iOS ve Android uygulamalarında kartla ve cüzdanla ödeme.
 steps[6]{id:str status priority deps:str owner?= note?= title}>steps

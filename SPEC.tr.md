@@ -1,7 +1,7 @@
-# .bpp — Format Spesifikasyonu (sürüm `bpp2`)
+# .bpp — Format Spesifikasyonu (sürüm `bpp3`)
 
-> Durum: **v2** (`bpp2`; decoder `bpp1` dosyalarını da okur, bkz. §11). Her karar `bench/experiments.py` ile ölçüldü; ham sonuçlar
-> `bench/results/experiments.md`'de. Benchmark sonuçları ve `bpp2` için revizyon önerileri (R1–R5):
+> Durum: **v3** (`bpp3`; decoder `bpp1` ve `bpp2` dosyalarını da okur, bkz. §11). Her karar `bench/experiments.py` ile ölçüldü; ham sonuçlar
+> `bench/results/experiments.md`'de. Benchmark sonuçları ve revizyon önerileri (R1–R5):
 > [BENCHMARK.tr.md](BENCHMARK.tr.md) §5.
 > English: [SPEC.md](SPEC.md)
 
@@ -31,7 +31,7 @@ daha fazla eksik saydığını belirtir); **formatlar arası göreli fark** esas
 ## 1. Dosya yapısı
 
 ```
-bpp2                      ← başlık satırı (zorunlu, sürüm)
+bpp3                      ← başlık satırı (zorunlu, sürüm)
 # ...                     ← 0+ yorum/primer satırı (opsiyonel)
 &0 uzun tekrarlanan değer ← 0+ sözlük tanımı (opsiyonel)
 ...gövde...               ← kök değer
@@ -210,6 +210,48 @@ steps[2]{id:str status? priority deps:str owner?= note?= title}>steps
 Sembollü outline %5 daha ucuzdur ama `< @ #` icat edilmiş anlamlar taşır (ilke #1'e aykırı,
 anlama riski); kendini açıklayan `deps=`/`owner=` tercih edildi.
 
+### 4.3.1 İç içe nesneler ve alt tablolar (bpp3)
+
+Gerçek API yanıtları iç içedir: bir siparişin `customer` nesnesi ve `items` listesi vardır.
+bpp1/bpp2 bu dizileri tabloya koyamıyor, `- ` öğelerine (§4.4) düşüyordu. bpp3 satır tablosunu iki
+yönde genişletir:
+
+```
+orders[2]{id customer.city status customer.name}>items{sku qty name}
+A-1 London paid Ada Lovelace
+ K-1 2 Blue pen
+ K-2 1 Red pen
+A-2 Wilmslow sent Alan Turing
+ K-3 5 Notebook
+```
+
+* **Sütun yolları.** `a.b.c` sütunu, satırdaki `a` nesnesinin içindeki `b` nesnesinin `c`
+  anahtarıdır. İç içe nesneler (her derinlikte) bu sütunlara açılır. Kendisi `.` içeren bir anahtar
+  başlıkta tırnaklanır (`"a.b"`). Yol sütunları diğer sütunlar gibi zorunlu, opsiyonel (`?`, `?=`)
+  ve `:str` olabilir; anahtarlı opsiyonel yol `a.b=değer` diye yazılır. Decode sırasında bir nesne,
+  sütunlarından en az biri satırda varsa oluşturulur; böylece var olan ve olmayan nesneler birebir
+  geri gelir. Düzleştirme yalnızca tüm satırlar uyuşuyorsa kullanılır: `k` bir satırda nesne,
+  başka satırda düz değerse dizi satır tablosu olarak yazılmaz.
+* **Alt tablolar.** Tek başına `>child`, alt satırların aynı sütunları kullandığı anlamına gelir
+  (planlardaki gibi ağaç). `>child{...}` alt satırlara kendi sütunlarını verir. Alt satırlar üst
+  satırın altında bir boşluk girintiyle yazılır; alt tabloların da kendi alt tabloları olabilir
+  (`>parts{...}>subs{...}`). Boş alt liste eskisi gibi `child=[]`.
+
+Encoder önce ağacı (aynı sütunlar), sonra alt tabloyu, sonra alt tablosuz halini dener ve kayıpsız
+olan ilk düzeni alır; ardından olağan maliyet karşılaştırması (§4.2) bu satır tablosu, virgüllü
+tablo ve `- ` öğeleri arasında seçim yapar. Anahtar sırası başlık sırasıyla yeniden kurulur;
+`keep_order` açıkken encoder yalnızca yeniden kurulan nesnelerin anahtar sırası orijinalle birebir
+aynı olan düzeni kullanır.
+
+**Ölçüm (`examples/orders.json`, her biri müşteri nesnesi ve 1–3 kalem içeren 20 sipariş):**
+
+| | o200k | claude2 |
+|---|---:|---:|
+| bpp2 (`- ` öğeleri) | 1762 | 1839 |
+| **bpp3 (yollar + alt tablo)** | **1151 (−%34.7)** | **1178 (−%35.9)** |
+| minified JSON | 2231 | 2455 |
+| TOON | 2276 | 2342 |
+
 ### 4.4 Genel liste: `key[N]` + `- ` öğeleri
 
 Tablo/satır tablosu olamayan (karışık tipli, iç içe nesneli) diziler:
@@ -256,7 +298,7 @@ Kök nesne ise girdileri 0 girintide yazılır. Kök dizi anahtarsız başlıkla
 YAML anchor/alias gösterimi (LLM'in tanıdığı kalıp):
 
 ```
-bpp2
+bpp3
 &0 Connection to upstream payment provider timed out after 30000ms
 &1 payments-gateway-eu-west-1
 logs[80]{ts,level,service,message,latency_ms}
@@ -308,21 +350,21 @@ steps[5]{status? note?= title}>steps
 Formatı hiç görmemiş bir LLM için dosyanın başına `#` yorum satırı olarak eklenebilir
 (`bpp encode --primer`). Decoder yok sayar.
 
-**1 satır (o200k 70 / claude2 73 token):**
+**1 satır (o200k 84 / claude2 88 token):**
 ```
-# bpp2: JSON as 'key value' lines, 1-space indent nests. k[N]{a b}: N rows of values in column order, last column = rest of line; x? = optional ('-' if absent), x?= columns appear as x=v. "..." = JSON string, *n = &n.
+# bpp3: JSON as 'key value' lines, 1-space indent nests. k[N]{a b.c}: N rows, values in column order (b.c = key c of b), last one = rest of line; x? optional (- = absent), x?= as x=v; >k: indented rows are k. "..." = JSON string, *n = &n.
 ```
 
-**3 satır (115 / 123 token):**
+**3 satır (136 / 146 token):**
 ```
-# bpp2 = JSON data. Lines are 'key value'; a bare 'key' opens a nested object (1-space indent). [a,b] = list.
-# k[N]{a b c}: N rows, values space-separated in column order, last column = rest of line;
-# x? = optional, '-' if absent; x?= written as x=v; >kids: indented rows are kids. {a,b}: comma rows. k[N]: N '- ' items. "..." = JSON string. *n = &n value.
+# bpp3 = JSON data. Lines are 'key value'; a bare 'key' opens a nested object (1-space indent). [a,b] = list.
+# k[N]{a b.c d}: N rows, values space-separated in column order, b.c = key c inside object b, last column = rest of line;
+# x? = optional, '-' if absent; x?= written as x=v; >kids: indented rows are kids, >kids{...} gives them their own columns. {a,b}: comma rows. k[N]: N '- ' items. "..." = JSON string. *n = &n value.
 ```
 
 > Aşama 4 revizyonu: Aşama 1'deki primer "k[N]{a,b} = N CSV rows" diyordu; Aşama 2'de satır
 > tablosu varsayılan olunca primer gerçek sözdizimini anlatacak şekilde yeniden yazıldı
-> (38 → 60 token). `bpp2` ile `x?` / `x?=` ayrımı eklendi (60 → 70 token).
+> (38 → 60 token). `bpp2` ile `x?` / `x?=` ayrımı eklendi (60 → 70 token); bpp3 yolları ve alt tabloları ekledi (70 → 84 token).
 
 Primer sabit maliyettir: 60 satırlık tabloda (~2050 token) %2–3, küçük bir config'te (~330 token)
 %12–35. Varsayılan **kapalı**; Aşama 4'te anlama testinin primer'li/primer'siz karşılaştırması
@@ -345,7 +387,7 @@ yapılacak.
 ## 10. Gramer (özet, EBNF benzeri)
 
 ```
-file      = "bpp2" NL {comment} {def} body
+file      = "bpp3" NL {comment} {def} body
 comment   = INDENT "#" {any} NL
 def       = "&" digits SP scalar NL
 body      = object(0) | rootarray | scalar NL
@@ -353,10 +395,13 @@ object(d) = {entry(d)}
 entry(d)  = I(d) key SP inline NL                          (* skaler / [..] / {} / [] *)
           | I(d) key NL object(d+1)                        (* iç içe nesne *)
           | I(d) key "[" N "]" "{" cols(",") "}" NL N×row(d, ",")
-          | I(d) key "[" N "]" "{" cols(" ") "}" [">" key] NL rowtree(d)
+          | I(d) key "[" N "]" spec NL rowtree(d, spec)
           | I(d) key "[" N "]" NL N×item(d)
 item(d)   = I(d) "- " (inline | entry-tail) NL [object(d+1)]
-col       = key ["?" ["="]] [":str"]                       (* ? ve ?= yalnızca boşluklu başlıkta *)
+spec      = "{" cols(" ") "}" [">" seg [spec]]               (* >k: aynı şema; >k{..}: kendi şeması *)
+col       = path ["?" ["="]] [":str"]                      (* ? ve ?= yalnızca boşluklu başlıkta *)
+path      = seg {"." seg}                                   (* bpp3; bpp1/2: tek anahtar *)
+seg       = "." içermeyen anahtar  |  jsonstring
 inline    = scalar | "[" [scalar {"," scalar}] "]" | "{}"
 scalar    = "null" | "true" | "false" | number | jsonstring | "*" digits | barestring
 I(d)      = d × " "
@@ -364,6 +409,11 @@ I(d)      = d × " "
 
 ## 11. Sürüm geçmişi
 
+* **bpp3** — Sütun yolları (`customer.name`) ve kendi sütunları olan alt tablolar
+  (`>items{sku qty name}`) eklendi; iç içe nesne ve alt liste içeren nesne dizileri artık satır
+  tablosuna sığıyor. Ölçüm (`examples/orders.json`): 1762 → 1151 token (o200k, −%34.7), 1839 → 1178
+  (claude2, −%35.9); diğer örnekler değişmedi. `.` içeren anahtarlar tablo başlıklarında
+  tırnaklanır. Decoder bpp1/bpp2 başlıklarını eski kurallarıyla okur (`.` anahtarın parçasıdır).
 * **bpp2** — Pozisyonel opsiyonel sütun (`ad?`, eksikse `-`) eklendi; bpp1'deki `ad?` (anahtarlı)
   gösterimi `ad?=` oldu. Gerekçe: Markdown checklist planında .bpp kaynak Markdown'a kaybediyordu,
   çünkü çoğu satırda bulunan `status` her satırda `status=` diye tekrar ediliyordu. Ölçüm

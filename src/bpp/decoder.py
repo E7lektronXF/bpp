@@ -6,7 +6,36 @@ import re
 
 from .lexer import BppError, Cursor
 
-_HEADER_RE = re.compile(r"\[(\d+)\](?:\{(.*)\}(?:>(.+))?)?$")
+_COUNT_RE = re.compile(r"\[(\d+)\]")
+
+
+def _header(text: str):
+    """`[N]` or `[N]{...}` at the start of text -> (N, rest) or None."""
+    m = _COUNT_RE.match(text)
+    if not m or (m.end() < len(text) and text[m.end()] != "{"):
+        return None
+    return int(m.group(1)), text[m.end():]
+
+
+class _Spec:
+    """Parsed column spec of a table or row table (see encoder._Spec)."""
+
+    def __init__(self, cols, delim, child, sub):
+        self.cols, self.delim, self.child, self.sub = cols, delim, child, sub
+        self.order = [c[0] for c in cols]
+        self.smode = {c[0]: c[3] for c in cols}
+        self.optional = {c[0] for c in cols if c[1]}
+        self.keyed = {c[0] for c in cols if c[2]}
+        self.positional = [p for p in self.order[:-1] if p not in self.keyed]
+
+
+def _set_path(obj: dict, path: tuple, v, line):
+    for k in path[:-1]:
+        nxt = obj.setdefault(k, {})
+        if not isinstance(nxt, dict):
+            raise BppError(f"column {'.'.join(path)!r} conflicts with {k!r}", line)
+        obj = nxt
+    obj[path[-1]] = v
 
 
 class _Line:
@@ -28,13 +57,13 @@ def decode(text: str):
         if not stripped or stripped.startswith("#"):
             continue
         if not version:
-            if stripped not in ("bpp1", "bpp2"):
-                raise BppError("missing 'bpp2' header", no)
+            if stripped not in ("bpp1", "bpp2", "bpp3"):
+                raise BppError("missing 'bpp3' header", no)
             version = int(stripped[3])
             continue
         lines.append(_Line(len(ln) - len(stripped), stripped, no))
     if not version:
-        raise BppError("missing 'bpp2' header")
+        raise BppError("missing 'bpp3' header")
     return _Dec(lines, version).document()
 
 
@@ -139,8 +168,8 @@ class _Dec:
     # -- arrays ------------------------------------------------------------------
     def keyless(self, ln: _Line, d: int):
         """A line at depth d beginning with '[': header `[N]...` or inline list."""
-        m = _HEADER_RE.match(ln.text)
-        if m and (m.group(2) is not None or self._items_follow(d)):
+        h = _header(ln.text)
+        if h and (h[1] or self._items_follow(d)):
             self.i += 1
             return self.block(ln.text, ln, d)
         c = self.cur(ln)
@@ -156,33 +185,32 @@ class _Dec:
             self.L[j].text.startswith("- ") or self.L[j].text == "-")
 
     def block(self, head: str, ln: _Line, d: int) -> list:
-        m = _HEADER_RE.match(head)
-        if not m:
+        h = _header(head)
+        if not h:
             raise BppError("bad array header", ln.no)
-        n, cols, child = int(m.group(1)), m.group(2), m.group(3)
-        if cols is None:
+        n, rest = h
+        if not rest:
             return self.items(n, d, ln)
-        spec = self._columns(cols, ln)
-        if child is not None or any(c[1] for c in spec) or (len(spec) > 1 and spec.delim == " "):
-            if child is not None:
-                cc = self.cur(_Line(0, child, ln.no))
-                child = cc.key()
-                if not cc.eof():
-                    raise BppError("bad child key", ln.no)
-            return self.outline(n, spec, child, d, ln)
-        return self.table(n, spec, d, ln)
+        c = self.cur(_Line(0, rest, ln.no))
+        spec = self._spec(c)
+        if not c.eof():
+            raise BppError("bad array header", ln.no)
+        if spec.child is None and not spec.optional and (len(spec.cols) == 1 or spec.delim == ","):
+            return self.table(n, spec, d, ln)
+        return self.outline(n, spec, d, ln)
 
-    def _columns(self, text: str, ln: _Line):
-        c = self.cur(_Line(0, text, ln.no))
-        out = _Cols()
+    def _spec(self, c: Cursor) -> _Spec:
+        dotted = self.version >= 3
+        c.expect("{")
+        cols = []
+        delim = None
         while True:
-            name = c.key()
-            opt = False
-            keyed = False
+            path = c.path(dotted)
+            opt = keyed = False
             if c.peek() == "?":
                 opt = True
                 c.i += 1
-                # bpp2: `x?` = positional, '-' when absent; `x?=` = written as x=v.
+                # bpp2+: `x?` = positional, '-' when absent; `x?=` = written as x=v.
                 # bpp1 only had the x=v form, spelled `x?`.
                 if self.version == 1:
                     keyed = True
@@ -193,88 +221,98 @@ class _Dec:
             if c.s.startswith(":str", c.i):
                 smode = True
                 c.i += 4
-            out.append((name, opt, keyed, smode))
-            if c.eof():
-                break
+            cols.append((path, opt, keyed, smode))
             sep = c.peek()
-            if out.delim is None:
-                out.delim = sep
-            if sep != out.delim or sep not in ", ":
-                raise BppError("bad column list", ln.no)
+            if sep == "}":
+                c.i += 1
+                break
+            if delim is None:
+                delim = sep
+            if sep != delim or sep not in ", ":
+                c.err("bad column list")
             c.i += 1
-        if out.delim is None:
-            out.delim = ","
-        return out
+        child = sub = None
+        if c.peek() == ">":
+            c.i += 1
+            child = c.segment() if dotted else c.key()
+            if dotted and c.peek() == "{":
+                sub = self._spec(c)
+        return _Spec(cols, delim or ",", child, sub)
 
-    def table(self, n: int, spec, d: int, ln: _Line) -> list:
+    def table(self, n: int, spec: _Spec, d: int, ln: _Line) -> list:
         rows = []
-        names = [s[0] for s in spec]
         for _ in range(n):
             if self.i >= len(self.L) or self.L[self.i].depth != d:
                 raise BppError(f"expected {n} table rows", ln.no)
             r = self.L[self.i]
             self.i += 1
             c = self.cur(r)
-            vals = []
-            for j, (_, _, _, smode) in enumerate(spec):
-                vals.append(c.token(",", smode))
-                if j < len(spec) - 1:
+            obj: dict = {}
+            for j, p in enumerate(spec.order):
+                _set_path(obj, p, c.token(",", spec.smode[p]), r.no)
+                if j < len(spec.order) - 1:
                     c.expect(",")
             if not c.eof():
                 raise BppError("too many cells", r.no)
-            rows.append(dict(zip(names, vals)))
+            rows.append(obj)
         return rows
 
-    def outline(self, n: int, spec, child, d: int, ln: _Line) -> list:
-        order = [s[0] for s in spec]
-        smode = {s[0]: s[3] for s in spec}
-        optional = {s[0] for s in spec if s[1]}
-        keyed = {s[0] for s in spec if s[2]}
-        last = order[-1]
-        if last in optional:
-            raise BppError("last column must be required", ln.no)
-        positional = [c for c in order[:-1] if c not in keyed]
-        kv_names = keyed | ({child} if child else set())
+    def outline(self, n: int, spec: _Spec, d: int, ln: _Line) -> list:
+        dotted = self.version >= 3
 
-        def row(r: _Line):
+        def check(sp):
+            if sp.order[-1] in sp.optional:
+                raise BppError("last column must be required", ln.no)
+            if sp.sub is not None:
+                check(sp.sub)
+        check(spec)
+
+        def row(r: _Line, sp: _Spec):
             c = self.cur(r)
             got = {}
-            for name in positional:
-                if name in optional and c.s.startswith("- ", c.i):
+            child_empty = False
+            for p in sp.positional:
+                if p in sp.optional and c.s.startswith("- ", c.i):
                     c.i += 2  # '-' = this optional column is absent
                     continue
-                got[name] = self._cell(c, smode[name])
+                got[p] = self._cell(c, sp.smode[p])
                 c.expect(" ")
             while True:
                 save = c.i
                 if c.peek() == '"' or c.peek() not in "[{*":
                     try:
-                        name = c.key()
+                        p = c.path(dotted)
                     except BppError:
                         c.i = save
                         break
-                    if name in kv_names and c.peek() == "=" and name not in got:
-                        c.i += 1
-                        if name == child:
-                            v = c.value(" ")
-                            if v != []:
+                    if c.peek() == "=":
+                        if sp.child is not None and p == (sp.child,) and not child_empty:
+                            c.i += 1
+                            if c.value(" ") != []:
                                 raise BppError("child key may only be [] inline", r.no)
-                        else:
-                            v = self._cell(c, smode[name])
-                        got[name] = v
-                        c.expect(" ")
-                        continue
+                            child_empty = True
+                            c.expect(" ")
+                            continue
+                        if p in sp.keyed and p not in got:
+                            c.i += 1
+                            got[p] = self._cell(c, sp.smode[p])
+                            c.expect(" ")
+                            continue
                 c.i = save
                 break
-            got[last] = c.value(strmode=smode[last])
+            last = sp.order[-1]
+            got[last] = c.value(strmode=sp.smode[last])
             if not c.eof():
                 raise BppError("trailing characters", r.no)
-            obj = {k: got[k] for k in order if k in got}
-            if child and child in got:
-                obj[child] = got[child]
+            obj: dict = {}
+            for p in sp.order:
+                if p in got:
+                    _set_path(obj, p, got[p], r.no)
+            if child_empty:
+                obj[sp.child] = []
             return obj
 
-        def rows_at(depth: int, count: int | None) -> list:
+        def rows_at(depth: int, count, sp: _Spec) -> list:
             out = []
             while self.i < len(self.L) and (count is None or len(out) < count):
                 r = self.L[self.i]
@@ -283,17 +321,17 @@ class _Dec:
                 if r.depth > depth:
                     raise BppError("unexpected indentation", r.no)
                 self.i += 1
-                obj = row(r)
-                if child and self.depth_at(self.i) == depth + 1:
-                    if child in obj:
+                obj = row(r, sp)
+                if sp.child is not None and self.depth_at(self.i) == depth + 1:
+                    if sp.child in obj:
                         raise BppError("child rows after child=[]", r.no)
-                    obj[child] = rows_at(depth + 1, None)
+                    obj[sp.child] = rows_at(depth + 1, None, sp.sub or sp)
                 out.append(obj)
             if count is not None and len(out) != count:
                 raise BppError(f"expected {count} rows", ln.no)
             return out
 
-        return rows_at(d, n)
+        return rows_at(d, n, spec)
 
     @staticmethod
     def _cell(c: Cursor, smode: bool):
@@ -317,8 +355,8 @@ class _Dec:
         body = it.text[2:]
         sub = _Line(d + 1, body, it.no)
         if body.startswith("["):
-            m = _HEADER_RE.match(body)
-            if m and (m.group(2) is not None or (
+            h = _header(body)
+            if h and (h[1] or (
                     self.i < len(self.L) and self.L[self.i].depth == d + 1
                     and self.L[self.i].text.startswith("- "))):
                 return self.block(body, sub, d + 1)
@@ -355,10 +393,6 @@ class _Dec:
         if not c.eof():
             raise BppError("trailing characters", it.no)
         return v
-
-
-class _Cols(list):
-    delim: str | None = None
 
 
 class _Sentinel:

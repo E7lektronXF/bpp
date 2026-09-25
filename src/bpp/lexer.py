@@ -11,6 +11,7 @@ SPECIAL = {"null": None, "true": True, "false": False,
            "NaN": math.nan, "Infinity": math.inf, "-Infinity": -math.inf}
 _CTRL = re.compile(r"[\x00-\x1f\x7f]")
 BARE_KEY_RE = re.compile(r"[^\s\"\[\]{}=,:?>\x00-\x1f\x7f]+")
+BARE_SEG_RE = re.compile(r"[^\s\"\[\]{}=,:?>.\x00-\x1f\x7f]+")  # a column-path segment
 _KV_START = re.compile(r"(?:[^\s\"\[\]{}=,:?>]+|\"(?:[^\"\\]|\\.)*\")=")
 _DECODER = json.JSONDecoder()
 
@@ -92,6 +93,13 @@ def fmt_key(k: str) -> str:
     return jstr(k)
 
 
+def fmt_seg(k: str) -> str:
+    """A key inside a table header, where '.' separates path segments."""
+    if BARE_SEG_RE.fullmatch(k) and k[0] not in "-#&*":
+        return k
+    return jstr(k)
+
+
 def fmt_inline(v, ctx: str = "value", strmode: bool = False) -> str | None:
     """Single-line form of v, or None if v needs a block."""
     if is_scalar(v):
@@ -158,6 +166,25 @@ class Cursor:
             self.err("expected key")
         self.i = m.end()
         return m.group()
+
+    def segment(self) -> str:
+        if self.peek() == '"':
+            return self.jstring()
+        m = BARE_SEG_RE.match(self.s, self.i)
+        if not m or self.s[self.i] in "-#&*":
+            self.err("expected key")
+        self.i = m.end()
+        return m.group()
+
+    def path(self, dotted: bool) -> tuple:
+        """A column path `a.b.c` (bpp3); in bpp1/2 headers a column is one key."""
+        if not dotted:
+            return (self.key(),)
+        out = [self.segment()]
+        while self.peek() == ".":
+            self.i += 1
+            out.append(self.segment())
+        return tuple(out)
 
     def resolve(self, tok: str, strmode: bool):
         if tok.startswith("*") and tok[1:].isdigit():

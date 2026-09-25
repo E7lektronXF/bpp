@@ -20,7 +20,7 @@ no API token is stored anywhere.
 
 1. Bump `version` in `pyproject.toml` and `__version__` in `src/bpp/__init__.py`.
 2. Commit and push to `main`; wait for CI to be green.
-3. On GitHub: **Releases → Draft a new release**, tag `v<version>` (for example `v0.2.0`),
+3. On GitHub: **Releases → Draft a new release**, tag `v<version>` (for example `v0.3.0`),
    then **Publish release**. The workflow builds, checks and uploads the package.
 4. Check https://pypi.org/project/bpp-format/ and try `pip install bpp-format` in a clean
    virtualenv.

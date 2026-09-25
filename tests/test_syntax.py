@@ -7,14 +7,14 @@ from bpp import BppError, decode, encode
 
 def body(text):
     lines = text.split("\n")
-    assert lines[0] == "bpp2"
+    assert lines[0] == "bpp3"
     return "\n".join(lines[1:]).rstrip("\n")
 
 
 def test_header_and_primer():
-    assert encode({"a": 1}) == "bpp2\na 1\n"
+    assert encode({"a": 1}) == "bpp3\na 1\n"
     t = encode({"a": 1}, primer=True)
-    assert t.startswith("bpp2\n# bpp2:") and decode(t) == {"a": 1}
+    assert t.startswith("bpp3\n# bpp3:") and decode(t) == {"a": 1}
     assert encode({"a": 1}, primer="long").count("\n#") == 3
 
 
@@ -57,7 +57,7 @@ def test_optional_columns_and_children():
                  "1 owner=Ayşe a b\n"
                  " 1.1 c d\n"
                  " 1.2 steps=[] e")
-    assert decode("bpp2\n" + t) == x
+    assert decode("bpp3\n" + t) == x
 
 
 def test_frequent_optional_column_is_positional():
@@ -70,7 +70,7 @@ def test_frequent_optional_column_is_positional():
                  ' done a b\n'
                  ' todo c\n'
                  ' "-" -')
-    assert decode("bpp2\n" + t) == x
+    assert decode("bpp3\n" + t) == x
 
 
 def test_bpp1_files_still_decode():
@@ -85,7 +85,7 @@ def test_bpp1_files_still_decode():
 def test_dictionary():
     msg = "Connection to upstream timed out after 30000ms"
     t = encode({"logs": [{"i": i, "m": msg} for i in range(5)]})
-    assert t.startswith(f"bpp2\n&0 {msg}\n") and "*0" in t
+    assert t.startswith(f"bpp3\n&0 {msg}\n") and "*0" in t
 
 
 def test_generic_list_items():
@@ -152,7 +152,7 @@ def test_crlf_input():
     ("bpp2\na [1,2] x\n", "trailing"),
     ('bpp2\na"b 1\n', "expected space"),
     ("bpp2\na[x]\n", "bad array header"),
-    ("bpp2\nt[1]{a b}>x y\n1 z\n", "bad child key"),
+    ("bpp2\nt[1]{a b}>x y\n1 z\n", "bad array header"),
     ("bpp2\nt[1]{a,b c}\n1\n", "bad column list"),
     ("bpp2\nt[1]{a b?}\n1\n", "last column"),
     ("bpp2\nt[1]{a b}>k\n1 k=[1] x\n", "only be"),
@@ -174,3 +174,65 @@ def test_error_has_line_number():
     with pytest.raises(BppError) as e:
         decode("bpp2\na 1\nb\n")
     assert e.value.line == 3
+
+
+# ---------------------------------------------------------------- bpp3 ---
+
+ORDERS = {"orders": [
+    {"id": "A-1", "customer": {"name": "Ada Lovelace", "city": "London"}, "status": "paid",
+     "items": [{"sku": "K-1", "qty": 2, "name": "Blue pen"}, {"sku": "K-2", "qty": 1, "name": "Red pen"}]},
+    {"id": "A-2", "customer": {"name": "Alan Turing", "city": "Wilmslow"}, "status": "sent",
+     "items": [{"sku": "K-3", "qty": 5, "name": "Notebook"}]},
+]}
+
+
+def test_nested_objects_and_child_tables():
+    t = body(encode(ORDERS))
+    assert t == ("orders[2]{id customer.city status customer.name}>items{sku qty name}\n"
+                 "A-1 London paid Ada Lovelace\n"
+                 " K-1 2 Blue pen\n"
+                 " K-2 1 Red pen\n"
+                 "A-2 Wilmslow sent Alan Turing\n"
+                 " K-3 5 Notebook")
+    assert decode("bpp3\n" + t) == ORDERS
+
+
+def test_nested_keep_order_is_exact():
+    import json
+    text = encode(ORDERS, keep_order=True)
+    assert json.dumps(decode(text)) == json.dumps(ORDERS)
+
+
+def test_dotted_key_is_quoted_in_headers():
+    x = [{"a.b": 1, "c": "x y"}, {"a.b": 2, "c": "z w"}]
+    t = body(encode(x))
+    assert '"a.b"' in t.split("\n")[0]
+    assert decode("bpp3\n" + t) == x
+
+
+def test_bpp2_headers_keep_dots_literal():
+    assert decode("bpp2\nt[1]{a.b c}\n1 x y\n") == {"t": [{"a.b": 1, "c": "x y"}]}
+    assert decode("bpp3\nt[1]{a.b c}\n1 x y\n") == {"t": [{"a": {"b": 1}, "c": "x y"}]}
+
+
+def test_object_or_value_conflict_falls_back():
+    x = [{"k": {"a": 1}, "t": "x y"}, {"k": 5, "t": "z w"}]
+    t = encode(x)
+    assert "k.a" not in t
+    assert decode(t) == x
+
+
+def test_nested_optional_and_empty_children():
+    x = [{"id": 1, "c": {"n": "a"}, "items": []},
+         {"id": 2, "c": {"m": 3}, "items": [{"s": "q", "t": "long text"}]},
+         {"id": 3, "t": "x"}]
+    assert decode(encode(x)) == x
+    assert decode(encode(x, keep_order=True)) == x
+
+
+def test_grandchild_tables():
+    x = [{"id": i, "parts": [{"p": j, "subs": [{"s": k, "note": f"n {k}"} for k in range(2)]}
+                             for j in range(2)]} for i in range(2)]
+    t = encode(x)
+    assert ">parts{" in t and ">subs{" in t
+    assert decode(t) == x

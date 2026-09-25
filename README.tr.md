@@ -6,7 +6,7 @@
 
 `.bpp`, JSON/YAML/CSV verisini ve Markdown planlarını bir LLM'in **daha az token ile** okuyacağı
 bir metne çevirir, sonra kayıpsız geri çevirir. Örnek setlerde toplam token sayısı JSON'a göre
-**~%59**, TOON'a göre **~%30** daha az ([BENCHMARK.tr.md](BENCHMARK.tr.md)).
+**~%63**, TOON'a göre **~%36** daha az ([BENCHMARK.tr.md](BENCHMARK.tr.md)).
 
 Bir benzetmeyle: bpp, veriyi LLM'e göndermeden önce vakumlu paketlemek gibidir. İçerik aynı
 kalır, kapladığı yer (token) küçülür, açınca her şey eskisi gibi çıkar.
@@ -55,7 +55,7 @@ pip install tiktoken
 bpp --version
 ```
 
-Çıktı `bpp 0.2.0` olmalı. `bpp` komutu bulunamazsa aynı her şeyi `python -m bpp` ile
+Çıktı `bpp 0.3.0` olmalı. `bpp` komutu bulunamazsa aynı her şeyi `python -m bpp` ile
 çalıştırabilirsiniz (örneğin `python -m bpp --version`).
 
 ## Kullanım
@@ -97,7 +97,7 @@ Yanına `siparisler.bpp` oluşur. `.json`, `.yaml`, `.csv` ve `.md` dosyalarıyl
 `siparisler.bpp`:
 
 ```
-bpp2
+bpp3
 magaza Kadıköy Şubesi
 siparisler[3]{no urun adet fiyat musteri}
 1 Kulaklık 2 749.9 Ayşe Yılmaz
@@ -109,7 +109,7 @@ siparisler[3]{no urun adet fiyat musteri}
 
 `siparisler.bpp`'yi bir metin editöründe açın, içeriğini kopyalayıp ChatGPT, Claude vb. sohbet
 penceresine yapıştırın ve sorunuzu yazın. Model formatı ilk kez görecekse `--primer` ekleyin;
-dosyanın başına formatı anlatan tek bir açıklama satırı (~70 token) eklenir:
+dosyanın başına formatı anlatan tek bir açıklama satırı (~85 token) eklenir:
 
 ```bash
 bpp siparisler.json --primer
@@ -140,7 +140,7 @@ JSON (indent 2)    424    173      186            +0.0%              +0.0%
 JSON (minified)    261    109      129           -37.0%             -30.6%
 YAML               257    130      130           -24.9%             -30.1%
 bpp                159     74       83           -57.2%             -55.4%
-bpp + primer       377    144      157           -16.8%             -15.6%
+bpp + primer       398    158      172            -8.7%              -7.5%
 ```
 
 `o200k` ve `claude2` sütunları için `pip install tiktoken` gerekir; kurulu değilse yaklaşık bir tahmin
@@ -195,7 +195,7 @@ Kaldırmak için: `pip uninstall bpp`.
 </td><td>
 
 ```
-bpp2
+bpp3
 server
  host 0.0.0.0
  port 8080
@@ -224,6 +224,17 @@ steps[6]{id:str status priority deps:str owner?= note?= title}>steps
 2 done P1 [1] owner=Mehmet Mimari tasarım
 ```
 
+İç içe nesne ve alt liste içeren bir API yanıtı (`examples/orders.json`, JSON'da 3524, minified
+JSON'da 2231, .bpp'de 1151 token). `customer.city`, `customer` nesnesinin içindeki anahtardır; her
+siparişin `items` listesi, altındaki girintili satırlardır ve kendi sütunları vardır:
+
+```
+orders[20]{order_id customer.city status shipping_method total note customer.name}>items{sku qty unit_price name}
+ORD-2026-00001 Ankara paid standard 2897.68 *4 Ayşe Arslan
+ SKU-254 3 335.6 *3
+ SKU-940 1 1890.88 Laptop Standı
+```
+
 Bir Markdown checklist'i (`examples/project_plan.md`, Markdown'da 837 token, .bpp'de 792). Durumu
 olmayan satırlarda `-` yazılır:
 
@@ -240,6 +251,8 @@ Kurallar kısaca:
 * `anahtar değer` satırları; tek başına `anahtar` iç içe nesne açar (1 boşluk girinti).
 * `ad[N]{a b c}` → N satır, değerler sütun sırasıyla boşlukla ayrılmış, **son sütun satırın
   geri kalanı**. `>steps` → girintili satırlar üstteki satırın alt adımlarıdır.
+* İç içe veri: `customer.name`, `customer` nesnesinin içindeki `name` anahtarıdır; `>items{...}`
+  ise bir satırın altındaki girintili satırların, kendi sütunlarıyla onun `items` listesi olduğunu söyler.
 * Opsiyonel sütunlar: `x?` yerinde yazılır, değer yoksa `-`; `x?=` yalnızca varsa `x=değer`
   diye yazılır. (Encoder sık olanı `x?`, seyrek olanı `x?=` yapar.)
 * `"..."` → JSON string (yalnızca gerektiğinde tırnak). `[a,b]` → liste.
@@ -254,10 +267,10 @@ Formatı hiç görmemiş bir model için `--primer` dosyanın başına şu `#` y
 (decoder yok sayar):
 
 ```
-# bpp2: JSON as 'key value' lines, 1-space indent nests. k[N]{a b}: N rows of values in column order, last column = rest of line; x? = optional ('-' if absent), x?= columns appear as x=v. "..." = JSON string, *n = &n.
+# bpp3: JSON as 'key value' lines, 1-space indent nests. k[N]{a b.c}: N rows, values in column order (b.c = key c of b), last one = rest of line; x? optional (- = absent), x?= as x=v; >k: indented rows are k. "..." = JSON string, *n = &n.
 ```
 
-Primer ~70 token tutar. Küçük belgelerde (birkaç yüz token) kazancı silebilir; BENCHMARK §4.2'ye
+Primer ~85 token tutar. Küçük belgelerde (birkaç yüz token) kazancı silebilir; BENCHMARK §4.2'ye
 bakın.
 
 ## Sonuçlar (özet)
@@ -268,7 +281,7 @@ bakın.
 | iç içe config (YAML) | 601 | 365 | 399 | **323** | −%12 (min. JSON) |
 | yapılandırılmış plan (JSON) | 1609 | 990 | 1228 | **636** | −%36 (min. JSON) |
 | Markdown checklist planı | 1501 | 1025 | 1093 | **792** | −%5 (kaynak Markdown: 837) |
-| karışık API yanıtı | 3524 | 2231 | 2276 | **1762** | −%21 (min. JSON) |
+| iç içe nesneli API yanıtı | 3524 | 2231 | 2276 | **1151** | −%48 (min. JSON) |
 | tekrarlı loglar | 5629 | 4109 | 3348 | **1857** | −%42 (CSV) |
 
 o200k token'ı. claude2 tokenizer'ı ile sonuçlar aynı yönde. Ayrıntılar, anlama testi ve
@@ -302,7 +315,7 @@ bpp stats data.json [--markdown]
 
 | seçenek | etkisi |
 |---|---|
-| `--primer` | Başa açıklama satırı ekler (`short` ~70, `long` ~115 token). |
+| `--primer` | Başa açıklama satırı ekler (`short` ~85, `long` ~135 token). |
 | `--no-refs` | `&n`/`*n` sözlüğünü kapatır. |
 | `--keep-order` | Anahtar sırasını hiç değiştirmez. Varsayılanda encoder, `title` gibi bir metin sütununu satır sonuna taşıyabilir (veri aynı, JSON'daki anahtar sırası farklı). CSV'de her zaman açık. |
 | `-f/--force` | Kısayol modunda var olan dosyanın üzerine yazar (varsayılan: yazmaz). |
@@ -336,7 +349,7 @@ satırı için `cd bench/toon && npm install` gerekir.
 
 ```bash
 pip install -e ".[dev]"
-pytest -q                      # 205 test: round-trip, uç durumlar, hypothesis, CLI
+pytest -q                      # 217 test: round-trip, uç durumlar, hypothesis, CLI, JS paritesi
 python bench/run_tokens.py     # token benchmark'ını yeniden üret
 python bench/experiments.py    # SPEC'teki tasarım deneyleri
 ```

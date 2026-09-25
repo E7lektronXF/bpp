@@ -5,17 +5,18 @@ from __future__ import annotations
 from collections import Counter
 
 from .estimate import est_tokens
-from .lexer import NUM_RE, Ref, fmt_inline, fmt_key, fmt_scalar, is_scalar, jstr
+from .lexer import NUM_RE, Ref, fmt_inline, fmt_key, fmt_scalar, fmt_seg, is_scalar, jstr
 
-HEADER = "bpp2"
-PRIMER = ("# bpp2: JSON as 'key value' lines, 1-space indent nests. k[N]{a b}: N rows of values "
-          "in column order, last column = rest of line; x? = optional ('-' if absent), "
-          "x?= columns appear as x=v. \"...\" = JSON string, *n = &n.")
+HEADER = "bpp3"
+PRIMER = ("# bpp3: JSON as 'key value' lines, 1-space indent nests. k[N]{a b.c}: N rows, values "
+          "in column order (b.c = key c of b), last one = rest of line; x? optional (- = absent), "
+          "x?= as x=v; >k: indented rows are k. \"...\" = JSON string, *n = &n.")
 PRIMER_LONG = (
-    "# bpp2 = JSON data. Lines are 'key value'; a bare 'key' opens a nested object (1-space indent). [a,b] = list.\n"
-    "# k[N]{a b c}: N rows, values space-separated in column order, last column = rest of line;\n"
-    "# x? = optional, '-' if absent; x?= written as x=v; >kids: indented rows are kids. {a,b}: comma rows. "
-    "k[N]: N '- ' items. \"...\" = JSON string. *n = &n value."
+    "# bpp3 = JSON data. Lines are 'key value'; a bare 'key' opens a nested object (1-space indent). [a,b] = list.\n"
+    "# k[N]{a b.c d}: N rows, values space-separated in column order, b.c = key c inside object b, "
+    "last column = rest of line;\n"
+    "# x? = optional, '-' if absent; x?= written as x=v; >kids: indented rows are kids, >kids{...} gives "
+    "them their own columns. {a,b}: comma rows. k[N]: N '- ' items. \"...\" = JSON string. *n = &n value."
 )
 CHILD_KEYS = ("steps", "children", "subtasks", "tasks", "items", "nodes")
 MIN_REF_LEN = 8
@@ -133,10 +134,11 @@ class _Enc:
     def array(self, key: str, arr: list, d: int) -> list[str]:
         # Candidates in order of preference; ties go to the earlier one, so
         # order-preserving layouts win over the one that moves a column.
-        cands = [c for c in (self.table(key, arr, d),
-                             self.outline(key, arr, d, keep_order=True),
-                             None if self.keep_order else self.outline(key, arr, d))
-                 if c]
+        cands = []
+        for c in (self.table(key, arr, d), self.outline(key, arr, d, keep_order=True),
+                  None if self.keep_order else self.outline(key, arr, d)):
+            if c and c not in cands:
+                cands.append(c)
         if not cands or len(arr) <= 2:
             cands.append(self.items(key, arr, d))
         if len(cands) == 1:
@@ -151,7 +153,7 @@ class _Enc:
             if list(x) != cols or not all(is_scalar(v) for v in x.values()):
                 return None
         smode = [_str_col(x[c] for x in arr) for c in cols]
-        head = ",".join(fmt_key(c) + (":str" if s else "") for c, s in zip(cols, smode))
+        head = ",".join(fmt_seg(c) + (":str" if s else "") for c, s in zip(cols, smode))
         pad = " " * d
         lines = [f"{pad}{key}[{len(arr)}]{{{head}}}"]
         for x in arr:
@@ -159,98 +161,12 @@ class _Enc:
         return lines
 
     def outline(self, key, arr, d, keep_order=False):
-        if not arr or not all(isinstance(x, dict) and x for x in arr):
+        spec = _plan(arr, keep_order)
+        if spec is None:
             return None
-        child, nodes = None, None
-        seen = set()
-        for ck in list(CHILD_KEYS) + [k for x in arr for k in x]:
-            if ck in seen or not any(x.get(ck) for x in arr):
-                continue
-            seen.add(ck)
-            nodes = _tree_nodes(arr, ck)
-            if nodes is not None:
-                child = ck
-                break
-        if child is None:
-            nodes = arr
-        cols: list[str] = []
-        for x in nodes:
-            for k in x:
-                if k != child and k not in cols:
-                    cols.append(k)
-        for x in nodes:
-            for k, v in x.items():
-                if k != child and not (is_scalar(v) or v == {} or
-                                       (isinstance(v, list) and all(is_scalar(y) for y in v))):
-                    return None
-        if keep_order:
-            for x in nodes:
-                ks = list(x)
-                if child in x:
-                    if ks[-1] != child:
-                        return None
-                    ks.pop()
-                if ks != [c for c in cols if c in x]:
-                    return None
-        required = [c for c in cols if all(c in x for x in nodes)]
-        if not required:
-            return None
-        if len(cols) == 1 and not child:
-            return None  # would read back as a one-column comma table
-
-        def text_score(c):
-            vals = [x[c] for x in nodes]
-            if not all(isinstance(v, str) for v in vals):
-                return (0, 0)
-            return (1, sum(v.count(" ") + 1 for v in vals))
-        if keep_order:
-            if cols[-1] not in required:
-                return None
-            rest = cols[-1]
-        else:
-            rest = max(required, key=text_score)
-            if rest == cols[-1]:
-                return None  # identical to the keep_order variant
-        order = [c for c in cols if c != rest] + [rest]
-        smode = {c: _str_col(x[c] for x in nodes if c in x) for c in order}
-        optional = {c for c in order if c not in required}
-        # An optional column is positional with '-' for "absent" when that is
-        # cheaper than writing `name=` on every row that has it (SPEC §4.3).
-        keyed = set()
-        for c in optional:
-            present = sum(c in x for x in nodes)
-            if (len(nodes) - present) * est_tokens(" -") >= present * est_tokens(f" {fmt_key(c)}="):
-                keyed.add(c)
-        head = " ".join(fmt_key(c) + ("?=" if c in keyed else "?" if c in optional else "")
-                        + (":str" if smode[c] else "") for c in order)
-        lines = [f"{' ' * d}{key}[{len(arr)}]{{{head}}}" + (f">{fmt_key(child)}" if child else "")]
-
-        def row(x, depth):
-            parts = []
-            for c in order[:-1]:
-                if c not in keyed:
-                    parts.append(self._cell(x[c], "pos", smode[c]) if c in x else "-")
-            for c in order[:-1]:
-                if c in keyed and c in x:
-                    parts.append(f"{fmt_key(c)}={self._cell(x[c], 'pos', smode[c])}")
-            if child and child in x and not x[child]:
-                parts.append(f"{fmt_key(child)}=[]")
-            parts.append(self._cell(x[rest], "last", smode[rest]))
-            lines.append(" " * depth + " ".join(parts))
-            for y in (x.get(child) or []) if child else []:
-                row(y, depth + 1)
-
-        for x in arr:
-            row(x, d)
+        lines = [f"{' ' * d}{key}[{len(arr)}]{spec.header()}"]
+        _render(arr, spec, d, lines)
         return lines
-
-    @staticmethod
-    def _cell(v, ctx, strmode):
-        if isinstance(v, list):
-            return "[" + ",".join(fmt_scalar(y, "list", strmode) for y in v) + "]"
-        if v == {}:
-            return "{}"
-        return fmt_scalar(v, ctx, strmode)
 
     def items(self, key, arr, d):
         pad = " " * d
@@ -291,3 +207,182 @@ def _tree_nodes(arr, child):
                 return None
             stack.extend(reversed(kids))
     return nodes
+
+
+# ------------------------------------------------------------- row tables
+# A row table (SPEC §4.3) is described by a _Spec: its columns are paths into
+# the row object (('customer', 'name') is written customer.name), and it may
+# have one child key whose rows are indented under their parent, either with
+# the same spec (a tree, `>steps`) or with their own (`>items{...}`).
+
+_ABSENT = object()
+
+
+class _Spec:
+    def __init__(self, order, required, keyed, smode, child, sub):
+        self.order, self.required, self.keyed = order, required, keyed
+        self.smode, self.child, self.sub = smode, child, sub
+
+    def header(self) -> str:
+        cols = " ".join(
+            _fmt_path(p) + ("?=" if p in self.keyed else "" if p in self.required else "?")
+            + (":str" if self.smode[p] else "") for p in self.order)
+        out = "{" + cols + "}"
+        if self.child is not None:
+            out += ">" + fmt_seg(self.child) + (self.sub.header() if self.sub else "")
+        return out
+
+
+def _fmt_path(p) -> str:
+    return ".".join(fmt_seg(k) for k in p)
+
+
+def _cellable(v) -> bool:
+    return is_scalar(v) or v == {} or (isinstance(v, list) and all(is_scalar(y) for y in v))
+
+
+def _flat_node(x, skip):
+    """[(path, value)] of a row object with nested objects flattened, or None."""
+    out = []
+
+    def go(path, v):
+        if isinstance(v, dict) and v:
+            return all(go(path + (k,), y) for k, y in v.items())
+        if not _cellable(v):
+            return False
+        out.append((path, v))
+        return True
+
+    for k, v in x.items():
+        if k != skip and not go((k,), v):
+            return None
+    return out
+
+
+def _is_rows(v) -> bool:
+    return isinstance(v, list) and all(isinstance(y, dict) and y for y in v)
+
+
+def _plan(arr, keep_order):
+    if not arr or not all(isinstance(x, dict) and x for x in arr):
+        return None
+    seen = set()
+    for ck in list(CHILD_KEYS) + [k for x in arr for k in x]:
+        if ck in seen:
+            continue
+        seen.add(ck)
+        if not any(x.get(ck) for x in arr) or not all(ck not in x or _is_rows(x[ck]) for x in arr):
+            continue
+        nodes = _tree_nodes(arr, ck)
+        if nodes is not None:
+            spec = _plan_cols(arr, nodes, ck, None, keep_order)
+            if spec is not None:
+                return spec
+        sub = _plan([y for x in arr for y in x.get(ck) or []], keep_order)
+        if sub is not None:
+            spec = _plan_cols(arr, arr, ck, sub, keep_order)
+            if spec is not None:
+                return spec
+    return _plan_cols(arr, arr, None, None, keep_order)
+
+
+def _plan_cols(arr, nodes, child, sub, keep_order):
+    flats = []
+    for x in nodes:
+        f = _flat_node(x, child)
+        if f is None:
+            return None
+        flats.append(dict(f))
+    cols = []
+    seen = set()
+    for f in flats:
+        for p in f:
+            if p not in seen:
+                seen.add(p)
+                cols.append(p)
+    if any(p[:i] in seen for p in cols for i in range(1, len(p))):
+        return None  # a key is an object in one row and a value in another
+    required = [p for p in cols if all(p in f for f in flats)]
+    if not required or (len(cols) == 1 and child is None):
+        return None  # one plain column would read back as a comma table
+
+    def text_score(p):
+        # A dictionary reference stands for a (long) string, so it counts as text.
+        vals = [f[p] for f in flats]
+        if not all(isinstance(v, (str, Ref)) for v in vals):
+            return (0, 0)
+        return (1, sum(v.count(" ") + 1 if isinstance(v, str) else 1 for v in vals))
+
+    if keep_order:
+        if cols[-1] not in required:
+            return None
+        rest = cols[-1]
+    else:
+        rest = max(required, key=text_score)
+    order = [p for p in cols if p != rest] + [rest]
+    smode = {p: _str_col(f[p] for f in flats if p in f) for p in order}
+    optional = [p for p in order if p not in required]
+    # An optional column is positional with '-' for "absent" when that is
+    # cheaper than writing `name=` on every row that has it.
+    keyed = set()
+    for p in optional:
+        present = sum(p in f for f in flats)
+        if (len(flats) - present) * est_tokens(" -") >= present * est_tokens(f" {_fmt_path(p)}="):
+            keyed.add(p)
+    spec = _Spec(order, set(required), keyed, smode, child, sub)
+    if keep_order and not all(_ordered_eq(_rebuild(x, spec), x) for x in arr):
+        return None
+    return spec
+
+
+def _rebuild(x, spec):
+    """The object the decoder builds from x's row (to check key order)."""
+    flat = dict(_flat_node(x, spec.child))
+    out: dict = {}
+    for p in spec.order:
+        if p in flat:
+            o = out
+            for k in p[:-1]:
+                o = o.setdefault(k, {})
+            o[p[-1]] = flat[p]
+    if spec.child is not None and spec.child in x:
+        out[spec.child] = [_rebuild(y, spec.sub or spec) for y in x[spec.child]]
+    return out
+
+
+def _ordered_eq(a, b) -> bool:
+    if isinstance(a, dict):
+        return (isinstance(b, dict) and list(a) == list(b)
+                and all(_ordered_eq(a[k], b[k]) for k in a))
+    if isinstance(a, list):
+        return isinstance(b, list) and len(a) == len(b) and all(map(_ordered_eq, a, b))
+    return a is b or a == b
+
+
+def _cell(v, ctx, strmode):
+    if isinstance(v, list):
+        return "[" + ",".join(fmt_scalar(y, "list", strmode) for y in v) + "]"
+    if v == {}:
+        return "{}"
+    return fmt_scalar(v, ctx, strmode)
+
+
+def _render(arr, spec, depth, lines):
+    last = spec.order[-1]
+    for x in arr:
+        flat = dict(_flat_node(x, spec.child))
+        parts = []
+        for p in spec.order[:-1]:
+            if p not in spec.keyed:
+                parts.append(_cell(flat[p], "pos", spec.smode[p]) if p in flat else "-")
+        for p in spec.order[:-1]:
+            if p in spec.keyed and p in flat:
+                parts.append(f"{_fmt_path(p)}={_cell(flat[p], 'pos', spec.smode[p])}")
+        kids = x.get(spec.child) if spec.child is not None else None
+        if spec.child is not None and spec.child in x and not kids:
+            parts.append(f"{fmt_seg(spec.child)}=[]")
+        parts.append(_cell(flat[last], "last", spec.smode[last]))
+        lines.append(" " * depth + " ".join(parts))
+        if kids:
+            _render(kids, spec.sub or spec, depth + 1, lines)
+

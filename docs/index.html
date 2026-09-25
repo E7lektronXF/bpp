@@ -118,7 +118,7 @@ h2 { font: 600 20px var(--display); margin: 0; }
 .bar.me .fill { background: var(--accent); }
 @media (max-width: 560px) { .bar { grid-template-columns: 96px 1fr; } .bar .num { grid-column: 2; text-align: left; } }
 
-.cheats { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px 28px; border-top: 1px solid var(--rule); padding-top: 22px; }
+.cheats { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px 28px; border-top: 1px solid var(--rule); padding-top: 22px; }
 .cheats div { display: grid; gap: 4px; }
 .cheats code { font: 500 13px var(--mono); color: var(--accent); }
 .cheats .k { color: var(--muted); }
@@ -192,6 +192,7 @@ footer { color: var(--muted); font-size: 13px; }
   <section class="cheats" aria-label="How to read bpp">
     <div><span class="k"><code>key value</code></span><p>One entry per line. A key on its own line opens a nested object; one space of indentation per level.</p></div>
     <div><span class="k"><code>rows[3]{id name note?= title}</code></span><p>A table: 3 rows follow, values in column order. The last column is the rest of the line.</p></div>
+    <div><span class="k"><code>customer.name</code> · <code>&gt;items{sku qty}</code></span><p>Nested data: <code>customer.name</code> is the key <code>name</code> inside the object <code>customer</code>. Rows indented under a row are its <code>items</code>, with their own columns.</p></div>
     <div><span class="k"><code>status?</code> · <code>note?=</code></span><p>Optional columns: <code>status?</code> sits in place (<code>-</code> when absent); <code>note?=</code> appears only when present, as <code>note=…</code>.</p></div>
     <div><span class="k"><code>&amp;0 long text</code> · <code>*0</code></span><p>A long value that repeats is written once and referenced, like YAML anchors.</p></div>
   </section>
@@ -227,15 +228,16 @@ export class BppError extends Error {
 
 class Ref { constructor(idx) { this.idx = idx; } }
 
-export const HEADER = 'bpp2';
-export const PRIMER = "# bpp2: JSON as 'key value' lines, 1-space indent nests. k[N]{a b}: N rows of values " +
-  "in column order, last column = rest of line; x? = optional ('-' if absent), " +
-  'x?= columns appear as x=v. "..." = JSON string, *n = &n.';
+export const HEADER = 'bpp3';
+export const PRIMER = "# bpp3: JSON as 'key value' lines, 1-space indent nests. k[N]{a b.c}: N rows, values " +
+  "in column order (b.c = key c of b), last one = rest of line; x? optional (- = absent), " +
+  'x?= as x=v; >k: indented rows are k. "..." = JSON string, *n = &n.';
 export const PRIMER_LONG =
-  "# bpp2 = JSON data. Lines are 'key value'; a bare 'key' opens a nested object (1-space indent). [a,b] = list.\n" +
-  '# k[N]{a b c}: N rows, values space-separated in column order, last column = rest of line;\n' +
-  "# x? = optional, '-' if absent; x?= written as x=v; >kids: indented rows are kids. {a,b}: comma rows. " +
-  "k[N]: N '- ' items. \"...\" = JSON string. *n = &n value.";
+  "# bpp3 = JSON data. Lines are 'key value'; a bare 'key' opens a nested object (1-space indent). [a,b] = list.\n" +
+  '# k[N]{a b.c d}: N rows, values space-separated in column order, b.c = key c inside object b, ' +
+  'last column = rest of line;\n' +
+  "# x? = optional, '-' if absent; x?= written as x=v; >kids: indented rows are kids, >kids{...} gives " +
+  "them their own columns. {a,b}: comma rows. k[N]: N '- ' items. \"...\" = JSON string. *n = &n value.";
 const CHILD_KEYS = ['steps', 'children', 'subtasks', 'tasks', 'items', 'nodes'];
 const MIN_REF_LEN = 8;
 
@@ -247,6 +249,8 @@ const pyStrip = (s) => s.replace(STRIP_RE, '');
 const CTRL = /[\x00-\x1f\x7f]/;
 const NUM_RE = /^-?(?:0|[1-9]\p{Nd}*)(?:\.\p{Nd}+)?(?:[eE][+-]?\p{Nd}+)?$/u;
 const BARE_KEY_RE = new RegExp(`[^${PYWS}"\\[\\]{}=,:?>\\x00-\\x1f\\x7f]+`, 'uy');
+const BARE_SEG_RE = new RegExp(`[^${PYWS}"\\[\\]{}=,:?>.\\x00-\\x1f\\x7f]+`, 'uy');
+const BARE_SEG_FULL = new RegExp(`^[^${PYWS}"\\[\\]{}=,:?>.\\x00-\\x1f\\x7f]+$`, 'u');
 const BARE_KEY_FULL = new RegExp(`^[^${PYWS}"\\[\\]{}=,:?>\\x00-\\x1f\\x7f]+$`, 'u');
 const KV_START = new RegExp(`^(?:[^${PYWS}"\\[\\]{}=,:?>]+|"(?:[^"\\\\]|\\\\[^\\n])*")=`, 'u');
 const cpLen = (s) => { let n = 0; for (const _ of s) n++; return n; };
@@ -331,6 +335,11 @@ function fmtScalar(v, ctx = 'value', strmode = false) {
 
 function fmtKey(k) {
   return BARE_KEY_FULL.test(k) && !'-#&*'.includes(k[0]) ? k : jstr(k);
+}
+
+/** A key inside a table header, where '.' separates path segments. */
+function fmtSeg(k) {
+  return BARE_SEG_FULL.test(k) && !'-#&*'.includes(k[0]) ? k : jstr(k);
 }
 
 function fmtInline(v, ctx = 'value', strmode = false) {
@@ -427,6 +436,172 @@ function treeNodes(arr, child) {
   return nodes;
 }
 
+// ------------------------------------------------------------ row tables
+// Mirrors encoder._Spec / _plan in Python: columns are paths into the row
+// (customer.name), and one child key may hold indented rows, with the same
+// spec (a tree, >steps) or their own (>items{...}).
+const pathKey = (p) => JSON.stringify(p);
+const fmtPath = (p) => p.map(fmtSeg).join('.');
+const cellable = (v) => isScalar(v) || (v instanceof Map && !v.size) || (Array.isArray(v) && v.every(isScalar));
+const isRows = (v) => Array.isArray(v) && v.every((y) => y instanceof Map && y.size);
+
+class Spec {
+  constructor(order, required, keyed, smode, child, sub) {
+    Object.assign(this, { order, required, keyed, smode, child, sub });
+  }
+  header() {
+    const cols = this.order.map((p) => {
+      const k = pathKey(p);
+      return fmtPath(p) + (this.keyed.has(k) ? '?=' : this.required.has(k) ? '' : '?') +
+        (this.smode.get(k) ? ':str' : '');
+    }).join(' ');
+    let out = '{' + cols + '}';
+    if (this.child !== null) out += '>' + fmtSeg(this.child) + (this.sub ? this.sub.header() : '');
+    return out;
+  }
+}
+
+function flatNode(x, skip) {
+  const out = [];
+  const go = (path, v) => {
+    if (v instanceof Map && v.size) {
+      for (const [k, y] of v) if (!go([...path, k], y)) return false;
+      return true;
+    }
+    if (!cellable(v)) return false;
+    out.push([path, v]);
+    return true;
+  };
+  for (const [k, v] of x) if (k !== skip && !go([k], v)) return null;
+  return out;
+}
+
+function plan(arr, keepOrder) {
+  if (!arr.length || !arr.every((x) => x instanceof Map && x.size)) return null;
+  const seen = new Set();
+  for (const ck of [...CHILD_KEYS, ...arr.flatMap((x) => [...x.keys()])]) {
+    if (seen.has(ck)) continue;
+    seen.add(ck);
+    if (!arr.some((x) => pyTruthy(x.get(ck))) || !arr.every((x) => !x.has(ck) || isRows(x.get(ck)))) continue;
+    const nodes = treeNodes(arr, ck);
+    if (nodes !== null) {
+      const spec = planCols(arr, nodes, ck, null, keepOrder);
+      if (spec !== null) return spec;
+    }
+    const sub = plan(arr.flatMap((x) => (pyTruthy(x.get(ck)) ? x.get(ck) : [])), keepOrder);
+    if (sub !== null) {
+      const spec = planCols(arr, arr, ck, sub, keepOrder);
+      if (spec !== null) return spec;
+    }
+  }
+  return planCols(arr, arr, null, null, keepOrder);
+}
+
+function planCols(arr, nodes, child, sub, keepOrder) {
+  const flats = [];
+  for (const x of nodes) {
+    const f = flatNode(x, child);
+    if (f === null) return null;
+    flats.push(new Map(f.map(([p, v]) => [pathKey(p), v])));
+  }
+  const cols = [];
+  const seen = new Set();
+  for (const x of nodes) {
+    for (const [p] of flatNode(x, child)) {
+      const k = pathKey(p);
+      if (!seen.has(k)) { seen.add(k); cols.push(p); }
+    }
+  }
+  for (const p of cols) {
+    for (let i = 1; i < p.length; i++) if (seen.has(pathKey(p.slice(0, i)))) return null;
+  }
+  const required = cols.filter((p) => flats.every((f) => f.has(pathKey(p))));
+  if (!required.length || (cols.length === 1 && child === null)) return null;
+  const textScore = (p) => {
+    const vals = flats.map((f) => f.get(pathKey(p)));
+    if (!vals.every((v) => typeof v === 'string' || v instanceof Ref)) return [0, 0];
+    return [1, vals.reduce((a, v) => a + (typeof v === 'string' ? v.split(' ').length : 1), 0)];
+  };
+  let rest;
+  const lastCol = cols[cols.length - 1];
+  if (keepOrder) {
+    if (!required.includes(lastCol)) return null;
+    rest = lastCol;
+  } else {
+    let best = null;
+    for (const p of required) {
+      const sc = textScore(p);
+      if (best === null || sc[0] > best[0] || (sc[0] === best[0] && sc[1] > best[1])) { rest = p; best = sc; }
+    }
+  }
+  const order = [...cols.filter((p) => p !== rest), rest];
+  const smode = new Map(order.map((p) => {
+    const k = pathKey(p);
+    return [k, strCol(flats.filter((f) => f.has(k)).map((f) => f.get(k)))];
+  }));
+  const requiredSet = new Set(required.map(pathKey));
+  const keyed = new Set();
+  for (const p of order) {
+    const k = pathKey(p);
+    if (requiredSet.has(k)) continue;
+    const present = flats.filter((f) => f.has(k)).length;
+    if ((flats.length - present) * estTokens(' -') >= present * estTokens(` ${fmtPath(p)}=`)) keyed.add(k);
+  }
+  const spec = new Spec(order, requiredSet, keyed, smode, child, sub);
+  if (keepOrder && !arr.every((x) => orderedEq(rebuild(x, spec), x))) return null;
+  return spec;
+}
+
+function rebuild(x, spec) {
+  const flat = new Map(flatNode(x, spec.child).map(([p, v]) => [pathKey(p), v]));
+  const out = new Map();
+  for (const p of spec.order) {
+    const k = pathKey(p);
+    if (!flat.has(k)) continue;
+    let o = out;
+    for (const seg of p.slice(0, -1)) {
+      if (!o.has(seg)) o.set(seg, new Map());
+      o = o.get(seg);
+    }
+    o.set(p[p.length - 1], flat.get(k));
+  }
+  if (spec.child !== null && x.has(spec.child)) {
+    out.set(spec.child, x.get(spec.child).map((y) => rebuild(y, spec.sub || spec)));
+  }
+  return out;
+}
+
+function orderedEq(a, b) {
+  if (a instanceof Map) {
+    if (!(b instanceof Map) || a.size !== b.size) return false;
+    const ka = [...a.keys()], kb = [...b.keys()];
+    return ka.every((k, i) => k === kb[i]) && ka.every((k) => orderedEq(a.get(k), b.get(k)));
+  }
+  if (Array.isArray(a)) return Array.isArray(b) && a.length === b.length && a.every((y, i) => orderedEq(y, b[i]));
+  return a === b;
+}
+
+function renderRows(arr, spec, depth, lines) {
+  const last = spec.order[spec.order.length - 1];
+  for (const x of arr) {
+    const flat = new Map(flatNode(x, spec.child).map(([p, v]) => [pathKey(p), v]));
+    const parts = [];
+    for (const p of spec.order.slice(0, -1)) {
+      const k = pathKey(p);
+      if (!spec.keyed.has(k)) parts.push(flat.has(k) ? cell(flat.get(k), 'pos', spec.smode.get(k)) : '-');
+    }
+    for (const p of spec.order.slice(0, -1)) {
+      const k = pathKey(p);
+      if (spec.keyed.has(k) && flat.has(k)) parts.push(`${fmtPath(p)}=${cell(flat.get(k), 'pos', spec.smode.get(k))}`);
+    }
+    const kids = spec.child !== null ? x.get(spec.child) : undefined;
+    if (spec.child !== null && x.has(spec.child) && !pyTruthy(kids)) parts.push(`${fmtSeg(spec.child)}=[]`);
+    parts.push(cell(flat.get(pathKey(last)), 'last', spec.smode.get(pathKey(last))));
+    lines.push(' '.repeat(depth) + parts.join(' '));
+    if (pyTruthy(kids)) renderRows(kids, spec.sub || spec, depth + 1, lines);
+  }
+}
+
 function cell(v, ctx, strmode) {
   if (Array.isArray(v)) return '[' + v.map((y) => fmtScalar(y, 'list', strmode)).join(',') + ']';
   if (v instanceof Map && !v.size) return '{}';
@@ -459,8 +634,11 @@ class Enc {
   }
 
   array(key, arr, d) {
-    const cands = [this.table(key, arr, d), this.outline(key, arr, d, true),
-      this.keepOrder ? null : this.outline(key, arr, d, false)].filter(Boolean);
+    const cands = [];
+    for (const c of [this.table(key, arr, d), this.outline(key, arr, d, true),
+      this.keepOrder ? null : this.outline(key, arr, d, false)]) {
+      if (c && !cands.some((x) => x.join('\n') === c.join('\n'))) cands.push(c);
+    }
     if (!cands.length || arr.length <= 2) cands.push(this.items(key, arr, d));
     if (cands.length === 1) return cands[0];
     let best = cands[0], bestCost = estTokens(best.join('\n'));
@@ -480,7 +658,7 @@ class Enc {
       if (![...x.values()].every(isScalar)) return null;
     }
     const smode = cols.map((c) => strCol(arr.map((x) => x.get(c))));
-    const head = cols.map((c, i) => fmtKey(c) + (smode[i] ? ':str' : '')).join(',');
+    const head = cols.map((c, i) => fmtSeg(c) + (smode[i] ? ':str' : '')).join(',');
     const pad = ' '.repeat(d);
     const lines = [`${pad}${key}[${arr.length}]{${head}}`];
     for (const x of arr) lines.push(pad + cols.map((c, i) => fmtScalar(x.get(c), 'cell', smode[i])).join(','));
@@ -488,83 +666,10 @@ class Enc {
   }
 
   outline(key, arr, d, keepOrder = false) {
-    if (!arr.length || !arr.every((x) => x instanceof Map && x.size)) return null;
-    let child = null, nodes = null;
-    const seen = new Set();
-    for (const ck of [...CHILD_KEYS, ...arr.flatMap((x) => [...x.keys()])]) {
-      if (seen.has(ck) || !arr.some((x) => pyTruthy(x.get(ck)))) continue;
-      seen.add(ck);
-      nodes = treeNodes(arr, ck);
-      if (nodes !== null) { child = ck; break; }
-    }
-    if (child === null) nodes = arr;
-    const cols = [];
-    for (const x of nodes) for (const k of x.keys()) if (k !== child && !cols.includes(k)) cols.push(k);
-    for (const x of nodes) {
-      for (const [k, v] of x) {
-        if (k !== child && !(isScalar(v) || (v instanceof Map && !v.size) ||
-            (Array.isArray(v) && v.every(isScalar)))) return null;
-      }
-    }
-    if (keepOrder) {
-      for (const x of nodes) {
-        const ks = [...x.keys()];
-        if (child !== null && x.has(child)) {
-          if (ks[ks.length - 1] !== child) return null;
-          ks.pop();
-        }
-        const want = cols.filter((c) => x.has(c));
-        if (ks.length !== want.length || ks.some((k, i) => k !== want[i])) return null;
-      }
-    }
-    const required = cols.filter((c) => nodes.every((x) => x.has(c)));
-    if (!required.length) return null;
-    if (cols.length === 1 && child === null) return null;
-    const textScore = (c) => {
-      const vals = nodes.map((x) => x.get(c));
-      if (!vals.every((v) => typeof v === 'string')) return [0, 0];
-      return [1, vals.reduce((a, v) => a + v.split(' ').length, 0)];
-    };
-    let rest;
-    if (keepOrder) {
-      if (!required.includes(cols[cols.length - 1])) return null;
-      rest = cols[cols.length - 1];
-    } else {
-      let bestScore = null;
-      for (const c of required) {
-        const s = textScore(c);
-        if (bestScore === null || s[0] > bestScore[0] || (s[0] === bestScore[0] && s[1] > bestScore[1])) {
-          rest = c; bestScore = s;
-        }
-      }
-      if (rest === cols[cols.length - 1]) return null;
-    }
-    const order = [...cols.filter((c) => c !== rest), rest];
-    const smode = new Map(order.map((c) => [c, strCol(nodes.filter((x) => x.has(c)).map((x) => x.get(c)))]));
-    const optional = new Set(order.filter((c) => !required.includes(c)));
-    const keyed = new Set();
-    for (const c of optional) {
-      const present = nodes.filter((x) => x.has(c)).length;
-      if ((nodes.length - present) * estTokens(' -') >= present * estTokens(` ${fmtKey(c)}=`)) keyed.add(c);
-    }
-    const head = order.map((c) => fmtKey(c) + (keyed.has(c) ? '?=' : optional.has(c) ? '?' : '') +
-      (smode.get(c) ? ':str' : '')).join(' ');
-    const lines = [`${' '.repeat(d)}${key}[${arr.length}]{${head}}` + (child !== null ? `>${fmtKey(child)}` : '')];
-    const row = (x, depth) => {
-      const parts = [];
-      for (const c of order.slice(0, -1)) {
-        if (!keyed.has(c)) parts.push(x.has(c) ? cell(x.get(c), 'pos', smode.get(c)) : '-');
-      }
-      for (const c of order.slice(0, -1)) {
-        if (keyed.has(c) && x.has(c)) parts.push(`${fmtKey(c)}=${cell(x.get(c), 'pos', smode.get(c))}`);
-      }
-      if (child !== null && x.has(child) && !pyTruthy(x.get(child))) parts.push(`${fmtKey(child)}=[]`);
-      parts.push(cell(x.get(rest), 'last', smode.get(rest)));
-      lines.push(' '.repeat(depth) + parts.join(' '));
-      const kids = child !== null && pyTruthy(x.get(child)) ? x.get(child) : [];
-      for (const y of kids) row(y, depth + 1);
-    };
-    for (const x of arr) row(x, d);
+    const spec = plan(arr, keepOrder);
+    if (spec === null) return null;
+    const lines = [`${' '.repeat(d)}${key}[${arr.length}]${spec.header()}`];
+    renderRows(arr, spec, d, lines);
     return lines;
   }
 
@@ -646,6 +751,20 @@ class Cursor {
     this.i = j + 1;
     return v;
   }
+  segment() {
+    if (this.peek() === '"') return this.jstring();
+    BARE_SEG_RE.lastIndex = this.i;
+    const m = BARE_SEG_RE.exec(this.s);
+    if (!m || '-#&*'.includes(this.s[this.i])) this.err('expected key');
+    this.i += m[0].length;
+    return m[0];
+  }
+  path(dotted) {
+    if (!dotted) return [this.key()];
+    const out = [this.segment()];
+    while (this.peek() === '.') { this.i++; out.push(this.segment()); }
+    return out;
+  }
   key() {
     if (this.peek() === '"') return this.jstring();
     BARE_KEY_RE.lastIndex = this.i;
@@ -698,7 +817,32 @@ class Cursor {
   }
 }
 
-const HEADER_RE = /^\[([0-9]+)\](?:\{([\s\S]*)\}(?:>([\s\S]+))?)?$/;
+function header(text) {
+  const m = /^\[([0-9]+)\]/.exec(text);
+  if (!m || (m[0].length < text.length && text[m[0].length] !== '{')) return null;
+  return [parseInt(m[1], 10), text.slice(m[0].length)];
+}
+
+function setPath(obj, path, v, line) {
+  for (const k of path.slice(0, -1)) {
+    if (!obj.has(k)) obj.set(k, new Map());
+    const nxt = obj.get(k);
+    if (!(nxt instanceof Map)) throw new BppError(`column '${path.join('.')}' conflicts with '${k}'`, line);
+    obj = nxt;
+  }
+  obj.set(path[path.length - 1], v);
+}
+
+class DSpec {
+  constructor(cols, delim, child, sub) {
+    Object.assign(this, { cols, delim, child, sub });
+    this.order = cols.map((c) => c.path);
+    this.smode = new Map(cols.map((c) => [pathKey(c.path), c.smode]));
+    this.optional = new Set(cols.filter((c) => c.opt).map((c) => pathKey(c.path)));
+    this.keyed = new Set(cols.filter((c) => c.keyed).map((c) => pathKey(c.path)));
+    this.positional = this.order.slice(0, -1).filter((p) => !this.keyed.has(pathKey(p)));
+  }
+}
 const NO = Symbol('no');
 
 class Dec {
@@ -780,8 +924,8 @@ class Dec {
   }
 
   keyless(ln, d) {
-    const m = HEADER_RE.exec(ln.text);
-    if (m && (m[2] !== undefined || this.itemsFollow(d))) { this.i++; return this.block(ln.text, ln, d); }
+    const h = header(ln.text);
+    if (h && (h[1] || this.itemsFollow(d))) { this.i++; return this.block(ln.text, ln, d); }
     const c = this.cur(ln);
     const v = c.inlineList();
     if (!c.eof()) throw new BppError('trailing characters', ln.no);
@@ -795,30 +939,26 @@ class Dec {
   }
 
   block(head, ln, d) {
-    const m = HEADER_RE.exec(head);
-    if (!m) throw new BppError('bad array header', ln.no);
-    const n = parseInt(m[1], 10);
-    const cols = m[2];
-    let child = m[3] ?? null;
-    if (cols === undefined) return this.items(n, d, ln);
-    const spec = this.columns(cols, ln);
-    if (child !== null || spec.some((c) => c.opt) || (spec.length > 1 && spec.delim === ' ')) {
-      if (child !== null) {
-        const cc = this.cur({ text: child, no: ln.no });
-        child = cc.key();
-        if (!cc.eof()) throw new BppError('bad child key', ln.no);
-      }
-      return this.outline(n, spec, child, d, ln);
+    const h = header(head);
+    if (!h) throw new BppError('bad array header', ln.no);
+    const [n, rest] = h;
+    if (!rest) return this.items(n, d, ln);
+    const c = this.cur({ text: rest, no: ln.no });
+    const spec = this.spec(c);
+    if (!c.eof()) throw new BppError('bad array header', ln.no);
+    if (spec.child === null && !spec.optional.size && (spec.cols.length === 1 || spec.delim === ',')) {
+      return this.table(n, spec, d, ln);
     }
-    return this.table(n, spec, d, ln);
+    return this.outline(n, spec, d, ln);
   }
 
-  columns(text, ln) {
-    const c = this.cur({ text, no: ln.no });
-    const out = [];
-    out.delim = null;
+  spec(c) {
+    const dotted = this.version >= 3;
+    c.expect('{');
+    const cols = [];
+    let delim = null;
     for (;;) {
-      const name = c.key();
+      const path = c.path(dotted);
       let opt = false, keyed = false;
       if (c.peek() === '?') {
         opt = true;
@@ -828,15 +968,20 @@ class Dec {
       }
       let smode = false;
       if (c.s.startsWith(':str', c.i)) { smode = true; c.i += 4; }
-      out.push({ name, opt, keyed, smode });
-      if (c.eof()) break;
+      cols.push({ path, opt, keyed, smode });
       const sep = c.peek();
-      if (out.delim === null) out.delim = sep;
-      if (sep !== out.delim || !', '.includes(sep)) throw new BppError('bad column list', ln.no);
+      if (sep === '}') { c.i++; break; }
+      if (delim === null) delim = sep;
+      if (sep !== delim || !', '.includes(sep) || !sep) c.err('bad column list');
       c.i++;
     }
-    if (out.delim === null) out.delim = ',';
-    return out;
+    let child = null, sub = null;
+    if (c.peek() === '>') {
+      c.i++;
+      child = dotted ? c.segment() : c.key();
+      if (dotted && c.peek() === '{') sub = this.spec(c);
+    }
+    return new DSpec(cols, delim || ',', child, sub);
   }
 
   table(n, spec, d, ln) {
@@ -846,9 +991,9 @@ class Dec {
       const row = this.L[this.i++];
       const c = this.cur(row);
       const obj = new Map();
-      spec.forEach((s, j) => {
-        obj.set(s.name, c.token(',', s.smode));
-        if (j < spec.length - 1) c.expect(',');
+      spec.order.forEach((p, j) => {
+        setPath(obj, p, c.token(',', spec.smode.get(pathKey(p))), row.no);
+        if (j < spec.order.length - 1) c.expect(',');
       });
       if (!c.eof()) throw new BppError('too many cells', row.no);
       rows.push(obj);
@@ -856,75 +1001,85 @@ class Dec {
     return rows;
   }
 
-  outline(n, spec, child, d, ln) {
-    const order = spec.map((s) => s.name);
-    const smode = new Map(spec.map((s) => [s.name, s.smode]));
-    const optional = new Set(spec.filter((s) => s.opt).map((s) => s.name));
-    const keyed = new Set(spec.filter((s) => s.keyed).map((s) => s.name));
-    const last = order[order.length - 1];
-    if (optional.has(last)) throw new BppError('last column must be required', ln.no);
-    const positional = order.slice(0, -1).filter((c) => !keyed.has(c));
-    const kvNames = new Set([...keyed, ...(child !== null ? [child] : [])]);
+  outline(n, spec, d, ln) {
+    const dotted = this.version >= 3;
+    const check = (sp) => {
+      if (sp.optional.has(pathKey(sp.order[sp.order.length - 1]))) throw new BppError('last column must be required', ln.no);
+      if (sp.sub) check(sp.sub);
+    };
+    check(spec);
     const cellOf = (c, sm) => (c.peek() === '[' ? c.inlineList(sm) : c.value(' ', sm));
 
-    const row = (r) => {
+    const row = (r, sp) => {
       const c = this.cur(r);
       const got = new Map();
-      for (const name of positional) {
-        if (optional.has(name) && c.s.startsWith('- ', c.i)) { c.i += 2; continue; }
-        got.set(name, cellOf(c, smode.get(name)));
+      let childEmpty = false;
+      for (const p of sp.positional) {
+        const k = pathKey(p);
+        if (sp.optional.has(k) && c.s.startsWith('- ', c.i)) { c.i += 2; continue; }
+        got.set(k, cellOf(c, sp.smode.get(k)));
         c.expect(' ');
       }
       for (;;) {
         const save = c.i;
         if (c.peek() === '"' || !'[{*'.includes(c.peek())) {
-          let name;
-          try { name = c.key(); } catch (e) {
+          let p;
+          try { p = c.path(dotted); } catch (e) {
             if (!(e instanceof BppError)) throw e;
             c.i = save;
             break;
           }
-          if (kvNames.has(name) && c.peek() === '=' && !got.has(name)) {
-            c.i++;
-            let v;
-            if (name === child) {
-              v = c.value(' ');
+          if (c.peek() === '=') {
+            const k = pathKey(p);
+            if (sp.child !== null && k === pathKey([sp.child]) && !childEmpty) {
+              c.i++;
+              const v = c.value(' ');
               if (!Array.isArray(v) || v.length) throw new BppError('child key may only be [] inline', r.no);
-            } else v = cellOf(c, smode.get(name));
-            got.set(name, v);
-            c.expect(' ');
-            continue;
+              childEmpty = true;
+              c.expect(' ');
+              continue;
+            }
+            if (sp.keyed.has(k) && !got.has(k)) {
+              c.i++;
+              got.set(k, cellOf(c, sp.smode.get(k)));
+              c.expect(' ');
+              continue;
+            }
           }
         }
         c.i = save;
         break;
       }
-      got.set(last, c.value('', smode.get(last)));
+      const last = sp.order[sp.order.length - 1];
+      got.set(pathKey(last), c.value('', sp.smode.get(pathKey(last))));
       if (!c.eof()) throw new BppError('trailing characters', r.no);
       const obj = new Map();
-      for (const k of order) if (got.has(k)) obj.set(k, got.get(k));
-      if (child !== null && got.has(child)) obj.set(child, got.get(child));
+      for (const p of sp.order) {
+        const k = pathKey(p);
+        if (got.has(k)) setPath(obj, p, got.get(k), r.no);
+      }
+      if (childEmpty) obj.set(sp.child, []);
       return obj;
     };
 
-    const rowsAt = (depth, count) => {
+    const rowsAt = (depth, count, sp) => {
       const out = [];
       while (this.i < this.L.length && (count === null || out.length < count)) {
         const r = this.L[this.i];
         if (r.depth < depth) break;
         if (r.depth > depth) throw new BppError('unexpected indentation', r.no);
         this.i++;
-        const obj = row(r);
-        if (child !== null && this.depthAt(this.i) === depth + 1) {
-          if (obj.has(child)) throw new BppError('child rows after child=[]', r.no);
-          obj.set(child, rowsAt(depth + 1, null));
+        const obj = row(r, sp);
+        if (sp.child !== null && this.depthAt(this.i) === depth + 1) {
+          if (obj.has(sp.child)) throw new BppError('child rows after child=[]', r.no);
+          obj.set(sp.child, rowsAt(depth + 1, null, sp.sub || sp));
         }
         out.push(obj);
       }
       if (count !== null && out.length !== count) throw new BppError(`expected ${count} rows`, ln.no);
       return out;
     };
-    return rowsAt(d, n);
+    return rowsAt(d, n, spec);
   }
 
   items(n, d, ln) {
@@ -943,8 +1098,8 @@ class Dec {
     const body = it.text.slice(2);
     const sub = { depth: d + 1, text: body, no: it.no };
     if (body.startsWith('[')) {
-      const m = HEADER_RE.exec(body);
-      if (m && (m[2] !== undefined || (this.i < this.L.length && this.L[this.i].depth === d + 1 &&
+      const h = header(body);
+      if (h && (h[1] || (this.i < this.L.length && this.L[this.i].depth === d + 1 &&
           this.L[this.i].text.startsWith('- ')))) return this.block(body, sub, d + 1);
       const c = this.cur(sub);
       const v = c.inlineList();
@@ -989,13 +1144,13 @@ export function decode(text) {
     const stripped = ln.replace(/^ +/, '');
     if (!stripped || stripped.startsWith('#')) return;
     if (!version) {
-      if (stripped !== 'bpp1' && stripped !== 'bpp2') throw new BppError("missing 'bpp2' header", idx + 1);
+      if (!['bpp1', 'bpp2', 'bpp3'].includes(stripped)) throw new BppError("missing 'bpp3' header", idx + 1);
       version = Number(stripped[3]);
       return;
     }
     lines.push({ depth: ln.length - stripped.length, text: stripped, no: idx + 1 });
   });
-  if (!version) throw new BppError("missing 'bpp2' header");
+  if (!version) throw new BppError("missing 'bpp3' header");
   return new Dec(lines, version).document();
 }
 

@@ -1,6 +1,6 @@
-# .bpp — Format Specification (version `bpp2`)
+# .bpp — Format Specification (version `bpp3`)
 
-> Status: **v2** (`bpp2`; the decoder also reads `bpp1` files, see §11). Every decision was
+> Status: **v3** (`bpp3`; the decoder also reads `bpp1` and `bpp2` files, see §11). Every decision was
 > measured with `bench/experiments.py`; raw results are in `bench/results/experiments.md`.
 > Benchmark results and proposed revisions (R1–R5): [BENCHMARK.md](BENCHMARK.md) §5.
 > Türkçe: [SPEC.tr.md](SPEC.tr.md)
@@ -32,7 +32,7 @@ results.
 ## 1. File structure
 
 ```
-bpp2                      ← header line (required, version)
+bpp3                      ← header line (required, version)
 # ...                     ← 0+ comment/primer lines (optional)
 &0 long repeated value    ← 0+ dictionary definitions (optional)
 ...body...                ← the root value
@@ -157,7 +157,7 @@ kept** for clarity.
 > and picks the cheapest according to a deterministic token estimator; on a tie the
 > order-preserving candidate wins. Comma tables still win when most values contain spaces.
 
-### 4.3 Row table: space-delimited rows, sparse and recursive arrays — `key[N]{a b? c?= d}>child`
+### 4.3 Row table: space-delimited rows, sparse, nested and recursive arrays — `key[N]{a b.c? d?= e}>child`
 
 When the column names in the header are **separated by spaces**, rows are separated by spaces too.
 This layout was designed for plans and trees; the measurements showed it is also the cheapest form
@@ -214,6 +214,47 @@ steps[2]{id:str status? priority deps:str owner?= note?= title}>steps
 The symbol outline is 5% cheaper, but `< @ #` carry invented meanings, which goes against
 principle #1 and risks comprehension. The self-describing `deps=` / `owner=` was chosen instead.
 
+### 4.3.1 Nested objects and child tables (bpp3)
+
+Real API responses nest: an order has a `customer` object and a list of `items`. bpp1/bpp2 could
+not put such arrays in a table and fell back to `- ` items (§4.4). bpp3 extends the row table in
+two ways:
+
+```
+orders[2]{id customer.city status customer.name}>items{sku qty name}
+A-1 London paid Ada Lovelace
+ K-1 2 Blue pen
+ K-2 1 Red pen
+A-2 Wilmslow sent Alan Turing
+ K-3 5 Notebook
+```
+
+* **Column paths.** A column name `a.b.c` means key `c` inside object `b` inside object `a` of the
+  row. Nested objects are flattened into such columns (any depth). A key that itself contains `.`
+  is quoted in headers (`"a.b"`). Path columns can be required, optional (`?`, `?=`) and `:str`
+  like any other column; a keyed optional path is written `a.b=value`. When decoding, an object is
+  created only if at least one of its columns is present in the row, so absent and present
+  objects round-trip exactly. Flattening is used only when every row agrees: if `k` is an object
+  in one row and a plain value in another, the array is not written as a row table.
+* **Child tables.** `>child` alone means the child rows use the same columns (a tree, as in
+  plans). `>child{...}` gives the child rows their own columns. Child rows are indented one space
+  under their parent row; child tables can have their own children (`>parts{...}>subs{...}`).
+  An empty child list is `child=[]`, as before.
+
+The encoder first tries a tree (same columns), then a child table, then no child, and keeps the
+first layout that is lossless; the usual cost comparison (§4.2) then decides between that row
+table, a comma table and `- ` items. Key order is rebuilt in header order; with `keep_order` the
+encoder only uses a layout whose rebuilt objects have exactly the original key order.
+
+**Measured (`examples/orders.json`, 20 orders with a customer object and 1–3 items each):**
+
+| | o200k | claude2 |
+|---|---:|---:|
+| bpp2 (`- ` items) | 1762 | 1839 |
+| **bpp3 (paths + child table)** | **1151 (−34.7%)** | **1178 (−35.9%)** |
+| minified JSON | 2231 | 2455 |
+| TOON | 2276 | 2342 |
+
 ### 4.4 Generic list: `key[N]` + `- ` items
 
 For arrays that cannot be a table or row table (mixed types, nested objects):
@@ -256,13 +297,14 @@ quoted.
 | Is `42` a string or a number? | A number; the string is `"42"` or lives in a `:str` column. |
 | A value starting with `*` or `&` | Quoted; a bare `*n` is a reference. |
 | A lone `-` in a row table | The positional optional column is absent; the string is `"-"`. |
+| Is `a.b` in a header one key or a path? | A path (bpp3). A key containing `.` is quoted: `"a.b"`. |
 
 ## 6. Dictionary / references: `&n` and `*n`
 
 This is YAML's anchor/alias notation, a pattern LLMs already know:
 
 ```
-bpp2
+bpp3
 &0 Connection to upstream payment provider timed out after 30000ms
 &1 payments-gateway-eu-west-1
 logs[80]{ts level service message latency_ms}
@@ -316,21 +358,21 @@ steps[5]{status? note?= title}>steps
 For an LLM that has never seen the format, a `#` comment line can be prepended to the file
 (`bpp encode --primer`). The decoder ignores it.
 
-**1 line (o200k 70 / claude2 73 tokens):**
+**1 line (o200k 84 / claude2 88 tokens):**
 ```
-# bpp2: JSON as 'key value' lines, 1-space indent nests. k[N]{a b}: N rows of values in column order, last column = rest of line; x? = optional ('-' if absent), x?= columns appear as x=v. "..." = JSON string, *n = &n.
+# bpp3: JSON as 'key value' lines, 1-space indent nests. k[N]{a b.c}: N rows, values in column order (b.c = key c of b), last one = rest of line; x? optional (- = absent), x?= as x=v; >k: indented rows are k. "..." = JSON string, *n = &n.
 ```
 
-**3 lines (115 / 123 tokens):**
+**3 lines (136 / 146 tokens):**
 ```
-# bpp2 = JSON data. Lines are 'key value'; a bare 'key' opens a nested object (1-space indent). [a,b] = list.
-# k[N]{a b c}: N rows, values space-separated in column order, last column = rest of line;
-# x? = optional, '-' if absent; x?= written as x=v; >kids: indented rows are kids. {a,b}: comma rows. k[N]: N '- ' items. "..." = JSON string. *n = &n value.
+# bpp3 = JSON data. Lines are 'key value'; a bare 'key' opens a nested object (1-space indent). [a,b] = list.
+# k[N]{a b.c d}: N rows, values space-separated in column order, b.c = key c inside object b, last column = rest of line;
+# x? = optional, '-' if absent; x?= written as x=v; >kids: indented rows are kids, >kids{...} gives them their own columns. {a,b}: comma rows. k[N]: N '- ' items. "..." = JSON string. *n = &n value.
 ```
 
 > History: the Stage 1 primer said "k[N]{a,b} = N CSV rows". Once row tables became the default in
 > Stage 2 it was rewritten to describe the actual syntax (38 → 60 tokens). `bpp2` added the `x?` /
-> `x?=` distinction (60 → 70 tokens).
+> `x?=` distinction (60 → 70 tokens); bpp3 added paths and child tables (70 → 84 tokens).
 
 The primer is a fixed cost: 2–3% on a 60-row table (~2050 tokens) and 12–35% on a small config
 (~330 tokens). It is **off** by default. The comprehension benchmark compares answers with and
@@ -353,7 +395,7 @@ without it.
 ## 10. Grammar (summary, EBNF-like)
 
 ```
-file      = "bpp2" NL {comment} {def} body
+file      = "bpp3" NL {comment} {def} body
 comment   = INDENT "#" {any} NL
 def       = "&" digits SP scalar NL
 body      = object(0) | rootarray | scalar NL
@@ -361,10 +403,13 @@ object(d) = {entry(d)}
 entry(d)  = I(d) key SP inline NL                          (* scalar / [..] / {} / [] *)
           | I(d) key NL object(d+1)                        (* nested object *)
           | I(d) key "[" N "]" "{" cols(",") "}" NL N×row(d, ",")
-          | I(d) key "[" N "]" "{" cols(" ") "}" [">" key] NL rowtree(d)
+          | I(d) key "[" N "]" spec NL rowtree(d, spec)
           | I(d) key "[" N "]" NL N×item(d)
 item(d)   = I(d) "- " (inline | entry-tail) NL [object(d+1)]
-col       = key ["?" ["="]] [":str"]                       (* ? and ?= only in space headers *)
+spec      = "{" cols(" ") "}" [">" seg [spec]]               (* >k: same spec; >k{..}: own spec *)
+col       = path ["?" ["="]] [":str"]                      (* ? and ?= only in space headers *)
+path      = seg {"." seg}                                   (* bpp3; bpp1/2: a single key *)
+seg       = key without "."  |  jsonstring
 inline    = scalar | "[" [scalar {"," scalar}] "]" | "{}"
 scalar    = "null" | "true" | "false" | number | jsonstring | "*" digits | barestring
 I(d)      = d × " "
@@ -372,6 +417,11 @@ I(d)      = d × " "
 
 ## 11. Version history
 
+* **bpp3** added column paths (`customer.name`) and child tables with their own columns
+  (`>items{sku qty name}`), so arrays of objects with nested objects and sub-lists fit in a row
+  table. Measured on `examples/orders.json`: 1762 → 1151 tokens (o200k, −34.7%) and 1839 → 1178
+  (claude2, −35.9%); the other examples are unchanged. Keys containing `.` are quoted in table
+  headers. The decoder reads bpp1/bpp2 headers with their old rules (a `.` is part of the key).
 * **bpp2** added positional optional columns (`name?`, `-` when absent). bpp1's `name?` (keyed)
   became `name?=`. Reason: on the Markdown checklist plan, .bpp lost to the source Markdown
   because `status`, present in most rows, was repeated as `status=` on every row. Measured on

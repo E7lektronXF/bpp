@@ -50,6 +50,10 @@ def rand_value(r: random.Random, depth=0):
         row = {k: rand_value(r, 4) for k in keys if r.random() < 0.8} or {keys[0]: 1}
         if depth < 2 and r.random() < 0.3:
             row["steps"] = [{k: rand_value(r, 4) for k in keys} for _ in range(r.randrange(3))]
+        if r.random() < 0.4:  # nested object -> dotted columns (bpp3)
+            row["meta"] = {k: rand_value(r, 4) for k in r.sample(["x", "y", "a.b"], r.randrange(1, 3))}
+        if depth < 2 and r.random() < 0.3:  # child table with its own columns (bpp3)
+            row["items"] = [{"sku": rand_value(r, 4), "qty": r.randrange(9)} for _ in range(r.randrange(3))]
         rows.append(row)
     return rows
 

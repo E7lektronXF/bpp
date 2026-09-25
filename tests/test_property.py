@@ -36,7 +36,16 @@ def json_values(scalar=SCALAR):
                                                             st.fixed_dictionaries({"id": inner, "title": inner}),
                                                             max_size=3),
                                                             "note": inner}),
-                                  min_size=1, max_size=5)),
+                                  min_size=1, max_size=5)
+                       # rows with nested objects and child tables (bpp3)
+                       | st.lists(st.fixed_dictionaries(
+                           {"id": inner, "c": st.dictionaries(st.sampled_from(["n", "m", "a.b"]), inner,
+                                                              max_size=2)},
+                           optional={"items": st.lists(st.fixed_dictionaries({"s": inner},
+                                                                             optional={"t": inner}),
+                                                       max_size=3),
+                                     "t": inner}),
+                           min_size=1, max_size=4)),
         max_leaves=30)
 
 

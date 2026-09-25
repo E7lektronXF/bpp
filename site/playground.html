@@ -113,7 +113,7 @@ h2 { font: 600 20px var(--display); margin: 0; }
 .bar.me .fill { background: var(--accent); }
 @media (max-width: 560px) { .bar { grid-template-columns: 96px 1fr; } .bar .num { grid-column: 2; text-align: left; } }
 
-.cheats { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px 28px; border-top: 1px solid var(--rule); padding-top: 22px; }
+.cheats { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px 28px; border-top: 1px solid var(--rule); padding-top: 22px; }
 .cheats div { display: grid; gap: 4px; }
 .cheats code { font: 500 13px var(--mono); color: var(--accent); }
 .cheats .k { color: var(--muted); }
@@ -187,6 +187,7 @@ footer { color: var(--muted); font-size: 13px; }
   <section class="cheats" aria-label="How to read bpp">
     <div><span class="k"><code>key value</code></span><p>One entry per line. A key on its own line opens a nested object; one space of indentation per level.</p></div>
     <div><span class="k"><code>rows[3]{id name note?= title}</code></span><p>A table: 3 rows follow, values in column order. The last column is the rest of the line.</p></div>
+    <div><span class="k"><code>customer.name</code> · <code>&gt;items{sku qty}</code></span><p>Nested data: <code>customer.name</code> is the key <code>name</code> inside the object <code>customer</code>. Rows indented under a row are its <code>items</code>, with their own columns.</p></div>
     <div><span class="k"><code>status?</code> · <code>note?=</code></span><p>Optional columns: <code>status?</code> sits in place (<code>-</code> when absent); <code>note?=</code> appears only when present, as <code>note=…</code>.</p></div>
     <div><span class="k"><code>&amp;0 long text</code> · <code>*0</code></span><p>A long value that repeats is written once and referenced, like YAML anchors.</p></div>
   </section>

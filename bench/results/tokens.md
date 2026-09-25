@@ -14,7 +14,7 @@ Düz tablo: 60 çalışan × 10 sütun
 | CSV | 2165 | 2501 | -60.9% | -55.9% |
 | TOON | 2277 | 2496 | -58.9% | -56.0% |
 | bpp | **2042** | **2084** | -63.1% | -63.2% |
-| bpp + primer | 2112 | 2158 | -61.9% | -61.9% |
+| bpp + primer | 2126 | 2173 | -61.6% | -61.7% |
 | bpp --no-refs | 2042 | 2084 | -63.1% | -63.2% |
 
 bpp vs best non-bpp format: o200k -5.7%, claude2 -16.5%
@@ -30,7 +30,7 @@ bpp vs best non-bpp format: o200k -5.7%, claude2 -16.5%
 | YAML | 443 | 417 | -26.3% | -31.8% |
 | TOON | 399 | 389 | -33.6% | -36.3% |
 | bpp | **323** | **332** | -46.3% | -45.7% |
-| bpp + primer | 393 | 406 | -34.6% | -33.6% |
+| bpp + primer | 407 | 421 | -32.3% | -31.1% |
 | bpp --no-refs | 323 | 332 | -46.3% | -45.7% |
 
 bpp vs best non-bpp format: o200k -11.5%, claude2 -14.7%
@@ -46,7 +46,7 @@ Yapılandırılmış proje planı: 6 adım, 21 alt adım, bağımlılık/durum/�
 | YAML | 1212 | 1248 | -24.7% | -27.4% |
 | TOON | 1228 | 1257 | -23.7% | -26.9% |
 | bpp | **636** | **728** | -60.5% | -57.6% |
-| bpp + primer | 706 | 802 | -56.1% | -53.3% |
+| bpp + primer | 720 | 817 | -55.3% | -52.5% |
 | bpp --no-refs | 636 | 728 | -60.5% | -57.6% |
 
 bpp vs best non-bpp format: o200k -35.8%, claude2 -32.5%
@@ -64,7 +64,7 @@ Uzun Markdown proje planı: başlıklar, checkbox'lar, notlar
 | YAML | 1119 | 1288 | -25.4% | -25.8% |
 | TOON | 1093 | 1273 | -27.2% | -26.7% |
 | bpp | **792** | **1017** | -47.2% | -41.5% |
-| bpp + primer | 862 | 1091 | -42.6% | -37.2% |
+| bpp + primer | 876 | 1106 | -41.6% | -36.3% |
 | bpp --no-refs | 792 | 1017 | -47.2% | -41.5% |
 
 bpp vs best non-bpp format: o200k -5.4%, claude2 -5.7%
@@ -79,11 +79,11 @@ Karışık yapı: API yanıtı, 20 sipariş, iç içe nesneler ve serbest metin
 | JSON (minified) | 2231 | 2455 | -36.7% | -32.1% |
 | YAML | 2636 | 2526 | -25.2% | -30.1% |
 | TOON | 2276 | 2342 | -35.4% | -35.2% |
-| bpp | **1762** | **1839** | -50.0% | -49.1% |
-| bpp + primer | 1832 | 1913 | -48.0% | -47.1% |
-| bpp --no-refs | 1845 | 1983 | -47.6% | -45.1% |
+| bpp | **1151** | **1178** | -67.3% | -67.4% |
+| bpp + primer | 1235 | 1267 | -65.0% | -65.0% |
+| bpp --no-refs | 1285 | 1362 | -63.5% | -62.3% |
 
-bpp vs best non-bpp format: o200k -21.0%, claude2 -21.5%
+bpp vs best non-bpp format: o200k -48.4%, claude2 -49.7%
 
 ## logs — `examples/logs.json`
 
@@ -97,7 +97,7 @@ Tekrarlanan uzun değerler: 80 log kaydı
 | CSV | 3185 | 3249 | -43.4% | -41.6% |
 | TOON | 3348 | 3332 | -40.5% | -40.1% |
 | bpp | **1857** | **1800** | -67.0% | -67.6% |
-| bpp + primer | 1927 | 1874 | -65.8% | -66.3% |
+| bpp + primer | 1941 | 1889 | -65.5% | -66.0% |
 | bpp --no-refs | 2921 | 2952 | -48.1% | -46.9% |
 
 bpp vs best non-bpp format: o200k -41.7%, claude2 -44.6%
@@ -110,5 +110,5 @@ bpp vs best non-bpp format: o200k -41.7%, claude2 -44.6%
 | JSON (minified) | 12282 | 13374 | -33.3% | -29.3% |
 | YAML | 14385 | 14007 | -21.8% | -25.9% |
 | TOON | 10621 | 11089 | -42.3% | -41.4% |
-| bpp | 7412 | 7800 | -59.7% | -58.8% |
-| bpp + primer | 7832 | 8244 | -57.4% | -56.4% |
+| bpp | 6801 | 7139 | -63.0% | -62.3% |
+| bpp + primer | 7305 | 7673 | -60.3% | -59.4% |

@@ -48,25 +48,25 @@ and `bpp stats` add real `count_tokens` results as a third column.
 
 | example | JSON | JSON min | YAML | CSV | Markdown | TOON | **bpp** | bpp+primer | bpp vs best alternative |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---|
-| employees | 5538 | 3562 | 4388 | 2165 | – | 2277 | **2042** | 2112 | **-5.7%** (CSV) |
-| config | 601 | 365 | 443 | – | – | 399 | **323** | 393 | **-11.5%** (JSON min) |
-| plan | 1609 | 990 | 1212 | – | – | 1228 | **636** | 706 | **-35.8%** (JSON min) |
-| project_plan | 1501 | 1025 | 1119 | – | 837 | 1093 | **792** | 862 | **-5.4%** (Markdown) |
-| orders | 3524 | 2231 | 2636 | – | – | 2276 | **1762** | 1832 | **-21.0%** (JSON min) |
-| logs | 5629 | 4109 | 4587 | 3185 | – | 3348 | **1857** | 1927 | **-41.7%** (CSV) |
-| **total** | 18402 | 12282 | 14385 | | | 10621 | **7412** | 7832 | **-59.7%** vs JSON, **-30.2%** vs TOON |
+| employees | 5538 | 3562 | 4388 | 2165 | – | 2277 | **2042** | 2126 | **-5.7%** (CSV) |
+| config | 601 | 365 | 443 | – | – | 399 | **323** | 407 | **-11.5%** (JSON min) |
+| plan | 1609 | 990 | 1212 | – | – | 1228 | **636** | 720 | **-35.8%** (JSON min) |
+| project_plan | 1501 | 1025 | 1119 | – | 837 | 1093 | **792** | 876 | **-5.4%** (Markdown) |
+| orders | 3524 | 2231 | 2636 | – | – | 2276 | **1151** | 1235 | **-48.4%** (JSON min) |
+| logs | 5629 | 4109 | 4587 | 3185 | – | 3348 | **1857** | 1941 | **-41.7%** (CSV) |
+| **total** | 18402 | 12282 | 14385 | | | 10621 | **6801** | 7305 | **-63.0%** vs JSON, **-36.0%** vs TOON |
 
 ### claude2
 
 | example | JSON | JSON min | YAML | CSV | Markdown | TOON | **bpp** | bpp+primer | bpp vs best alternative |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---|
-| employees | 5669 | 3984 | 4072 | 2501 | – | 2496 | **2084** | 2158 | **-16.5%** (TOON) |
-| config | 611 | 393 | 417 | – | – | 389 | **332** | 406 | **-14.7%** (TOON) |
-| plan | 1719 | 1078 | 1248 | – | – | 1257 | **728** | 802 | **-32.5%** (JSON min) |
-| project_plan | 1737 | 1265 | 1288 | – | 1078 | 1273 | **1017** | 1091 | **-5.7%** (Markdown) |
-| orders | 3615 | 2455 | 2526 | – | – | 2342 | **1839** | 1913 | **-21.5%** (TOON) |
-| logs | 5563 | 4199 | 4456 | 3249 | – | 3332 | **1800** | 1874 | **-44.6%** (CSV) |
-| **total** | 18914 | 13374 | 14007 | | | 11089 | **7800** | 8244 | **-58.8%** vs JSON, **-29.7%** vs TOON |
+| employees | 5669 | 3984 | 4072 | 2501 | – | 2496 | **2084** | 2173 | **-16.5%** (TOON) |
+| config | 611 | 393 | 417 | – | – | 389 | **332** | 421 | **-14.7%** (TOON) |
+| plan | 1719 | 1078 | 1248 | – | – | 1257 | **728** | 817 | **-32.5%** (JSON min) |
+| project_plan | 1737 | 1265 | 1288 | – | 1078 | 1273 | **1017** | 1106 | **-5.7%** (Markdown) |
+| orders | 3615 | 2455 | 2526 | – | – | 2342 | **1178** | 1267 | **-49.7%** (TOON) |
+| logs | 5563 | 4199 | 4456 | 3249 | – | 3332 | **1800** | 1889 | **-44.6%** (CSV) |
+| **total** | 18914 | 13374 | 14007 | | | 11089 | **7139** | 7673 | **-62.3%** vs JSON, **-35.6%** vs TOON |
 
 Detailed tables, including the dictionary-free `--no-refs` variant: `bench/results/tokens.md`.
 
@@ -77,9 +77,10 @@ Detailed tables, including the dictionary-free `--no-refs` variant: `bench/resul
 | Keys written once (tables) | employees, logs, order line items, replicas | 55–60% smaller than JSON; the same mechanism as CSV/TOON |
 | Space-delimited rows (instead of `,`) | every table | 12% (o200k) / 22% (claude2) smaller than comma tables. A space merges into the next token; a comma does not |
 | `key value` (no `:`), 1-space indent | config, orders | 3–8% smaller than `key:value` |
-| Dictionary (`&n` / `*n`) | logs, orders | logs: 36% / 39% smaller than without it; orders: 4.5% / 7.3% |
+| Dictionary (`&n` / `*n`) | logs, orders | logs: 36% / 39% smaller than without it; orders: 10.4% / 13.5% |
 | Tree rows (`>steps`) | plan | 36% smaller than minified JSON; indented rows instead of nested objects |
 | Positional optional column (`status?`, `-` when absent), bpp2 | project_plan | 7.6% / 6.1% smaller than bpp1; the change that made it beat the source Markdown |
+| Column paths (`customer.name`) and child tables (`>items{...}`), bpp3 | orders | 34.7% / 35.9% smaller than bpp2, which wrote each order as a `- ` item |
 | Minimal quoting + raw UTF-8 | everywhere | `\u` escapes would cost 124–161% more tokens on Turkish text |
 
 **How much comes from the dictionary:** most of the big gap on the logs example comes from the
@@ -172,14 +173,24 @@ The difference between the prototype (786) and the real encoder (792) comes from
 notation (`status? note?=`). The cost: in tables with keyed optional columns, the header grows by
 one `=` per such column (`plan.json`: 634 → 636). The other examples are unchanged.
 
-**Still open:** with the primer, .bpp is again more expensive than Markdown on this example (862
-vs 837; 1091 vs 1078 on claude2). Every LLM already knows Markdown; whether .bpp is understood
+**Where the remaining tokens are:** 695 of the 792 tokens (o200k; 943 of 1017 on claude2) are
+the titles and notes themselves, which cost the same in any format. The structure on top of that
+costs 97 tokens in bpp versus 142 in Markdown (−32%; 74 versus 135, −45%, on claude2). Even a
+format with no structure at all could save at most another ~12% on this file.
+
+**Text blocks re-measured (R2):** writing notes as plain indented lines under their row instead
+of `note="…"` gave 794 tokens instead of 792 in bpp2: the saved quotes and `note=` are paid back
+as newline, indentation and a marker. R2 was dropped.
+
+**Still open:** with the primer, .bpp is again more expensive than Markdown on this example (876
+vs 837; 1106 vs 1078 on claude2). Every LLM already knows Markdown; whether .bpp is understood
 without the primer has to be measured by the comprehension benchmark (§3).
 
 ### 4.2 The primer cancels the savings on small documents
 
-The 1-line primer is 70–73 tokens, longer than bpp1's 60 because it also explains `x?` / `x?=`.
-On the config example, .bpp with the primer (393) costs more than minified JSON (365). On the
+The 1-line primer is 84–88 tokens (bpp1: 60): bpp2 added `x?` / `x?=` and bpp3 added paths and
+child tables to its explanation. On the config example, .bpp with the primer (407) costs more than
+minified JSON (365). On the
 Markdown plan it also costs more than Markdown (§4.1). On large documents its effect is 2–4%.
 
 ### 4.3 Small margin over CSV (o200k)
@@ -193,10 +204,9 @@ depends on the tokenizer.
 | # | proposal | reason | status |
 |---|---|---|---|
 | R1 | **Write frequently present optional columns positionally**, with `-` when missing (the string `"-"` is quoted). Header: `x?` positional, `x?=` keyed. The encoder picks per column by comparing `missing·t(" -")` with `present·t(" x=")`. | §4.1: −7.6% / −6.1%; 5.4% / 5.7% smaller than Markdown | **implemented (`bpp2`)** |
-| R2 | A **text block** for multi-line text columns: indented lines under the row that can be told apart from child rows | §4.1: a further −1.8% | measured, not implemented; needs a design that avoids ambiguity with child rows |
+| R2 | A **text block** for multi-line text columns: indented lines under the row that can be told apart from child rows | §4.1: a further −1.8% | **dropped**: re-measured in bpp2, no gain (794 vs 792 tokens; §4.1) |
 | R3 | Add the primer only to large documents (e.g. `--primer auto` when the body exceeds 1000 tokens) | §4.2 | recommended; if the comprehension benchmark shows the primer helps, pick the threshold from those results |
 | R4 | Make the dictionary threshold tunable after the comprehension benchmark (`--refs min-gain=N`); if accuracy drops, use it only for long values that repeat a lot | §3 risk 1 | depends on the comprehension results |
-| R5 | Flatten nested objects inside list items (`customer` in orders) into dotted columns (`customer.name`) in a row table | orders is still written as `- ` items | **not measured**; dotted keys were bad for the config in E2 (+22% on claude2), so tables need their own measurement |
+| R5 | Flatten nested objects inside list items (`customer` in orders) into dotted columns (`customer.name`) in a row table, with child tables for sub-lists | orders was written as `- ` items | **implemented (`bpp3`)**: orders −34.7% / −35.9% (SPEC §4.3.1) |
 
-R1 shipped as `bpp2`. The `bpp2` decoder still reads `bpp1` files (SPEC §11). R2 is a candidate
-for the next version (`bpp3`).
+R1 shipped as `bpp2` and R5 as `bpp3`. The decoder still reads `bpp1` and `bpp2` files (SPEC §11).
