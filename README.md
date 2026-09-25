@@ -1,5 +1,9 @@
 # bpp — give LLMs your data in ~63% fewer tokens
 
+[![PyPI](https://img.shields.io/pypi/v/bpp-format)](https://pypi.org/project/bpp-format/) [![CI](https://github.com/E7lektronXF/bpp/actions/workflows/ci.yml/badge.svg)](https://github.com/E7lektronXF/bpp/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+
+![Pretty JSON: 146 tokens. The same data as bpp: 53 tokens.](assets/bpp-compare.png)
+
 **bpp** converts JSON, YAML, CSV and Markdown plans into `.bpp`, a compact text format that
 language models read with far fewer tokens. You can convert it back without losing anything.
 

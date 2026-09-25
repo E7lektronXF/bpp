@@ -1,5 +1,9 @@
 # bpp — LLM'e veri verirken daha az token için yeni seçenecek
 
+[![PyPI](https://img.shields.io/pypi/v/bpp-format)](https://pypi.org/project/bpp-format/) [![CI](https://github.com/E7lektronXF/bpp/actions/workflows/ci.yml/badge.svg)](https://github.com/E7lektronXF/bpp/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+
+![Aynı veri: JSON 146 token, bpp 53 token.](assets/bpp-compare.png)
+
 🇬🇧 English: [README.md](README.md)
 
 **▶ [Tarayıcıda deneyin](https://e7lektronxf.github.io/bpp/):** kurulum olmadan kendi verinizi yapıştırıp token sayılarını karşılaştırın.
