@@ -28,7 +28,7 @@ python bench/run_qa.py          # -> bench/results/qa.md (API anahtarı gerekir)
 **Formatlar:** JSON (2 boşluk girinti), minified JSON, YAML (PyYAML, `allow_unicode`), CSV
 (yalnızca düz tablolarda), Markdown (yalnızca md örneğinde, kaynak dosya), TOON (referans
 `@toon-format/toon` 4.1.1, varsayılan ayarlar), `.bpp` (varsayılan ayarlar) ve `.bpp` + 1 satır
-primer.
+primer. Markdown örneği, `bpp x.md`'nin yaptığı gibi kaynağından `encode_md` ile kodlanır.
 
 **Token sayaçları:**
 
@@ -48,25 +48,25 @@ olmadığına işaret eder. `ANTHROPIC_API_KEY` tanımlıysa `run_tokens.py` ve 
 
 | örnek | JSON | JSON min | YAML | CSV | Markdown | TOON | **bpp** | bpp+primer | bpp vs en iyi rakip |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---|
-| employees | 5538 | 3562 | 4388 | 2165 | – | 2277 | **2042** | 2126 | **-5.7%** (CSV) |
-| config | 601 | 365 | 443 | – | – | 399 | **323** | 407 | **-11.5%** (JSON min) |
-| plan | 1609 | 990 | 1212 | – | – | 1228 | **636** | 720 | **-35.8%** (JSON min) |
-| project_plan | 1501 | 1025 | 1119 | – | 837 | 1093 | **792** | 876 | **-5.4%** (Markdown) |
-| orders | 3524 | 2231 | 2636 | – | – | 2276 | **1151** | 1235 | **-48.4%** (JSON min) |
-| logs | 5629 | 4109 | 4587 | 3185 | – | 3348 | **1857** | 1941 | **-41.7%** (CSV) |
-| **toplam** | 18402 | 12282 | 14385 | | | 10621 | **6801** | 7305 | JSON'a göre **-63.0%**, TOON'a göre **-36.0%** |
+| employees | 5538 | 3562 | 4388 | 2165 | – | 2277 | **2042** | 2088 | **-5.7%** (CSV) |
+| config | 601 | 365 | 443 | – | – | 399 | **323** | 369 | **-11.5%** (JSON min) |
+| plan | 1609 | 990 | 1212 | – | – | 1228 | **634** | 698 | **-36.0%** (JSON min) |
+| project_plan | 1445 | 990 | 1083 | – | 837 | 1024 | **758** | 822 | **-9.4%** (Markdown) |
+| orders | 3524 | 2231 | 2636 | – | – | 2276 | **1151** | 1221 | **-48.4%** (JSON min) |
+| logs | 5629 | 4109 | 4587 | 3185 | – | 3348 | **1857** | 1903 | **-41.7%** (CSV) |
+| **toplam** | 18346 | 12247 | 14349 | | | 10552 | **6765** | 7101 | JSON'a göre **-63.1%**, TOON'a göre **-35.9%** |
 
 ### claude2
 
 | örnek | JSON | JSON min | YAML | CSV | Markdown | TOON | **bpp** | bpp+primer | bpp vs en iyi rakip |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---|
-| employees | 5669 | 3984 | 4072 | 2501 | – | 2496 | **2084** | 2173 | **-16.5%** (TOON) |
-| config | 611 | 393 | 417 | – | – | 389 | **332** | 421 | **-14.7%** (TOON) |
-| plan | 1719 | 1078 | 1248 | – | – | 1257 | **728** | 817 | **-32.5%** (JSON min) |
-| project_plan | 1737 | 1265 | 1288 | – | 1078 | 1273 | **1017** | 1106 | **-5.7%** (Markdown) |
-| orders | 3615 | 2455 | 2526 | – | – | 2342 | **1178** | 1267 | **-49.7%** (TOON) |
-| logs | 5563 | 4199 | 4456 | 3249 | – | 3332 | **1800** | 1889 | **-44.6%** (CSV) |
-| **toplam** | 18914 | 13374 | 14007 | | | 11089 | **7139** | 7673 | JSON'a göre **-62.3%**, TOON'a göre **-35.6%** |
+| employees | 5669 | 3984 | 4072 | 2501 | – | 2496 | **2084** | 2133 | **-16.5%** (TOON) |
+| config | 611 | 393 | 417 | – | – | 389 | **332** | 381 | **-14.7%** (TOON) |
+| plan | 1719 | 1078 | 1248 | – | – | 1257 | **727** | 794 | **-32.6%** (JSON min) |
+| project_plan | 1683 | 1240 | 1259 | – | 1078 | 1215 | **996** | 1062 | **-7.6%** (Markdown) |
+| orders | 3615 | 2455 | 2526 | – | – | 2342 | **1178** | 1252 | **-49.7%** (TOON) |
+| logs | 5563 | 4199 | 4456 | 3249 | – | 3332 | **1800** | 1849 | **-44.6%** (CSV) |
+| **toplam** | 18860 | 13349 | 13978 | | | 11031 | **7117** | 7471 | JSON'a göre **-62.3%**, TOON'a göre **-35.5%** |
 
 Ayrıntılı tablolar (sözlüksüz `--no-refs` varyantı dahil): `bench/results/tokens.md`.
 
@@ -78,9 +78,10 @@ Ayrıntılı tablolar (sözlüksüz `--no-refs` varyantı dahil): `bench/results
 | Boşlukla ayrılmış satırlar (`,` yerine) | tüm tablolar | virgüllü tabloya göre −%12 (o200k) / −%22 (claude2). Boşluk bir sonraki token'a kaynaşıyor, virgül kaynaşmıyor |
 | `key value` (`:` yok), 1 boşluk girinti | config, orders | `key:value`'ya göre −%3…−%8 |
 | Sözlük (`&n` / `*n`) | logs, orders | logs'ta sözlüksüz haline göre −%36 / −%39; orders'ta −%10.4 / −%13.5 |
-| Ağaç satırları (`>steps`) | plan | JSON min'e göre −%36; iç içe nesneler yerine girintili satırlar |
+| Ağaç satırları (`>steps`; bpp4'ten beri tek başına `>`) | plan | JSON min'e göre −%36; iç içe nesneler yerine girintili satırlar |
 | Pozisyonel opsiyonel sütun (`status?`, eksikse `-`) — bpp2 | project_plan | bpp1'e göre −%7.6 / −%6.1; kaynak Markdown'ı geçmesini sağlayan değişiklik |
 | Sütun yolları (`customer.name`) ve alt tablolar (`>items{...}`) — bpp3 | orders | her siparişi `- ` öğesi olarak yazan bpp2'ye göre −%34.7 / −%35.9 |
+| Birleştirilen satır sonları, `\|N` blokları, tek başına `>`, başlıklar için alt tablolar — bpp4 | project_plan, Markdown belgeleri | project_plan 792 → 758 / 1017 → 996; §4.4'teki beş Markdown belgesi 15510 → 14824 / 16094 → 15513 |
 | Minimum tırnak + ham UTF-8 | her yerde | `\u` escape'i Türkçe metinde +%124…+%161 token olurdu |
 
 **Sözlüğün payı:** logs örneğindeki büyük farkın çoğu sözlükten geliyor. Sözlük kapatıldığında
@@ -182,15 +183,18 @@ daha kazandırabilirdi.
 satırlar olarak yazmak bpp2'de 792 yerine 794 token verdi: kazanılan tırnak ve `note=`, yeni satır,
 girinti ve önek olarak geri ödeniyor. R2 elendi.
 
-**Kalan açık:** primer eklenince .bpp bu örnekte yine Markdown'dan pahalı (876'ye karşı 837,
-claude2'de 1106'e karşı 1078). Markdown'u her LLM zaten tanır; .bpp'nin primer'siz anlaşılıp
-anlaşılmadığı anlama testiyle ölçülmeli (§3).
+**bpp4'te çözüldü:** primer eklenince .bpp bu örnekte yine Markdown'dan pahalıydı (876'ya karşı
+837, claude2'de 1106'ya karşı 1078). bpp4 Markdown'a kendi, daha kısa primer'ını veriyor (84 / 88
+yerine 64 / 65 token) ve kaydırılmış madde satırlarını birleştiriyor (§4.4): primer'le plan artık
+822 / 1062 token. Markdown'u her LLM zaten tanır; .bpp'nin primer'siz anlaşılıp anlaşılmadığı
+anlama testiyle ölçülmeli (§3).
 
 ### 4.2 Primer küçük belgelerde kazancı siliyor
 
-1 satırlık primer 84–88 token (bpp1: 60): bpp2 `x?` / `x?=` ayrımını, bpp3 yolları ve alt tabloları
-açıklamaya ekledi. config örneğinde primer'li .bpp (407) minified JSON'dan (365) daha pahalı. Markdown planında
-da Markdown'dan pahalı (§4.1). Büyük belgelerde etkisi %2–4.
+bpp3'ün primer'ı 84 / 88 token'dı: bpp2 `x?` / `x?=` ayrımını, bpp3 yolları ve alt tabloları
+açıklamaya ekledi. bpp4'ten beri primer yalnızca dosyanın kullandığı sözdizimini anlatıyor: 40–108
+token (SPEC.tr §8). config örneğinde primer'li .bpp (369; bpp3: 407) hâlâ minified JSON'dan (365)
+pahalı. Büyük örneklerde (employees, logs) %2–3 ekliyor.
 
 ### 4.3 CSV'ye karşı fark küçük (o200k)
 
@@ -198,14 +202,56 @@ Düz tabloda .bpp CSV'den o200k'de yalnızca −%5.7 ucuz. claude2'de fark −%1
 bilgisi yoktur ve iç içe veri taşıyamaz. Yine de tamamen düz tablo için kazanç tokenizer'a bağlı
 ve küçüktür.
 
+### 4.4 Düz yazı ağırlıklı Markdown — `bpp3`'te kaybediyordu, `bpp4`'te çözüldü
+
+**bpp3'teki durum:** çoğu paragraftan oluşan belgelerde .bpp, Markdown kaynağından yaklaşık %3
+büyüktü: bu deponun README'si bpp3'te 3845, Markdown'da 3722 token (o200k); SPEC 6488'e karşı 6269,
+BENCHMARK 3872'ye karşı 3747, RELEASING 513'e karşı 497. Yalnızca checklist planı küçüktü (837'ye
+karşı 792).
+
+**Neden:**
+
+1. **Escape edilen çok satırlı notlar.** Bir başlığın metni onun `note`'udur, çok satırlı bir
+   string; JSON string olarak yazılıyordu: iki tırnak, her satır sonu ve tırnak escape'li (`\n`,
+   `\"`). Escape edilmiş `\n` kendi başına bir token'dır; ham satır sonu ise önündeki token'a
+   kaynaşır (`):\n\n` tek token). Her belgede bu maliyet farkın tamamı kadar ya da daha fazlaydı.
+2. **Kaydırılmış liste maddeleri.** Maddenin kaydırılmış ikinci satırı `note`'a gidiyordu. Başlık
+   son sütun olduğundan satırda cümlenin ikinci yarısı önce görünüyordu
+   (`note=virtualenv. Check https://pypi.org/... in a clean`) ve `note=` ile tırnaklar ödeniyordu.
+
+**Çözüm (bpp4, SPEC.tr §2.2, §7.1, §7.2):** çok satırlı string'ler `|N` blokları olarak yazılıyor
+(sonraki N satır, ham), kaydırılmış satırlar bir boşlukla birleştiriliyor, tek başına `>` `>steps`
+yerine geçiyor, başlıklar kendi sütunlarını alabiliyor, `**kalın**` artık tırnaklanmıyor ve ağaç
+yine de kaynaktan uzunsa `bpp4 md` kaynağın kendisini saklıyor. `bench/corpus/` üzerinde ölçüm
+(dört belgenin v0.3.0 hali ve örnek plan; `bench/results/experiments.md`, E10–E15):
+
+| belge | Markdown | bpp3 | **bpp4** |
+|---|---:|---:|---:|
+| README | 3722 / 3938 | 3845 / 4035 | **3703 / 3894** |
+| SPEC | 6269 / 6483 | 6488 / 6628 | **6144 / 6330** |
+| BENCHMARK | 3747 / 3802 | 3872 / 3861 | **3724 / 3756** |
+| RELEASING | 497 / 543 | 513 / 553 | **495 / 537** |
+| project_plan | 837 / 1078 | 792 / 1017 | **758 / 996** |
+| **toplam** | 15072 / 15844 | 15510 / 16094 | **14824 / 15513** |
+
+(o200k / claude2.) bpp3 sütunu v0.3.0 encoder'ıyla ölçüldü.
+
+**Geriye kalan:** düz yazıda bpp4, Markdown'dan yalnızca %0.4–2 küçük. Metnin kendisi ikisinde de
+aynı tutuyor; bpp `#`, `-` ve `1.` işaretlerinden kazanıyor, başlığına, tablo başlığına ve `note=`
+işaretlerine ödüyor. RELEASING'de fark 2 token. `bpp4 md` yedeği sayesinde ağacın uzatacağı bir
+dosya yalnızca 5 token'lık başlık satırı kadar büyür (encoder'ın tahminine göre; bu dosyalarda
+gerçek tokenizer'lar da aynı fikirde).
+
 ## 5. SPEC revizyon önerileri
 
 | # | öneri | gerekçe | durum |
 |---|---|---|---|
 | R1 | **Sık görülen opsiyonel sütun pozisyonel yazılsın**; eksik değer `-` (string `"-"` tırnaklanır). Başlıkta `x?` pozisyonel, `x?=` anahtarlı. Encoder sütun bazında `eksik·t(" -")` ile `mevcut·t(" x=")` maliyetini karşılaştırarak seçer. | §4.1: −%7.6 / −%6.1, Markdown'dan −%5.4 / −%5.7 ucuz | **uygulandı (`bpp2`)** |
-| R2 | Çok satırlı metin sütunları için **metin bloğu**: satırın altında, çocuk satırlardan ayırt edilebilir girintili satırlar | §4.1: ek −%1.8 | **elendi**: bpp2'de yeniden ölçüldü, kazanç yok (792 yerine 794 token; §4.1) |
-| R3 | Primer yalnızca belge büyükse eklensin (ör. `--primer auto`: gövde > 1000 token) | §4.2 | önerilir; anlama testi primer'in katkısını gösterirse eşik oradan seçilmeli |
+| R2 | Çok satırlı metin sütunları için **metin bloğu**: satırın altında, çocuk satırlardan ayırt edilebilir girintili satırlar | §4.1: ek −%1.8 | bpp2'de **elendi** (792 yerine 794 token; §4.1); **bpp4'te** satır sayısıyla sınırlanan, girintisiz `\|N` bloklarıyla **yerine konuldu** (§4.4) |
+| R3 | Primer yalnızca belge büyükse eklensin (ör. `--primer auto`: gövde > 1000 token) | §4.2 | önerilir; bpp4 primer'ı zaten kullanılan sözdizimine indirdi (40–108 token); eşik anlama testinden seçilmeli |
 | R4 | Sözlük eşiği anlama testine göre ayarlanabilsin (`--refs min-gain=N`); doğruluk düşerse yalnızca çok tekrarlanan uzun değerlerde kullanılsın | §3 risk 1 | anlama testi sonrasına bağlı |
 | R5 | Liste öğelerindeki iç içe nesneler (orders'taki `customer`) satır tablosunda noktalı sütunlara (`customer.name`), alt listeler alt tablolara açılsın | orders `- ` öğeleriyle yazılıyordu | **uygulandı (`bpp3`)**: orders −%34.7 / −%35.9 (SPEC §4.3.1) |
+| R6 | Markdown: `\|N` blokları, birleştirilen yumuşak satır sonları, Markdown primer'ı ve kaynağa dönen `bpp4 md` yedeği | §4.4: bpp3 düz yazılı Markdown'a ~%3 kaybediyordu | **uygulandı (`bpp4`)**: §4.4'teki her belge kaynağından küçük |
 
-R1 `bpp2`, R5 `bpp3` olarak uygulandı. Decoder `bpp1` ve `bpp2` dosyalarını okumaya devam eder ([SPEC.tr.md](SPEC.tr.md) §11).
+R1 `bpp2`, R5 `bpp3`, R6 `bpp4` olarak uygulandı. Decoder `bpp1`, `bpp2` ve `bpp3` dosyalarını okumaya
+devam eder ([SPEC.tr.md](SPEC.tr.md) §11).

@@ -1,4 +1,4 @@
-bpp3
+bpp4
 [60]{id name email department city salary rating active manager_id start_date}
 1 "Mustafa Doğan" mustafa.dogan@example.com Engineering İzmir 45000 3.0 true null 2022-04-04
 2 "Ümran Yılmaz" umran.yilmaz@example.com Finance Bursa 107500 4.0 false null 2024-05-24

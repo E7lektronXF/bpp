@@ -108,7 +108,15 @@ def q_plan(p):
 
 
 def q_project_plan(t):
-    nodes = {s["title"]: (s, par) for s, par in _flat(t["steps"])}
+    flat = list(_flat(t["steps"]))
+
+    class _Nodes:
+        # An item's wrapped lines are part of its title (SPEC §7), so look items
+        # up by the start of their title.
+        def __getitem__(self, title):
+            return next((s, par) for s, par in flat
+                        if s["title"] == title or s["title"].startswith(title + " "))
+    nodes = _Nodes()
 
     def status(title):
         return nodes[title][0].get("status")

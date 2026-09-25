@@ -1,4 +1,4 @@
-bpp3
+bpp4
 &0 Connection to upstream payment provider timed out after 30000ms
 &1 payments-gateway-eu-west-1
 &2 Database replica lag above threshold, falling back to primary

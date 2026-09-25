@@ -1,7 +1,7 @@
-bpp3
+bpp4
 title Mobil ödeme özelliğinin yayına alınması
 goal Q3 sonuna kadar iOS ve Android uygulamalarında kartla ve cüzdanla ödeme.
-steps[6]{id:str status priority deps:str owner?= note?= title}>steps
+steps[6]{id:str status priority deps:str owner?= note?= title}>
 1 done P1 [] owner=Ayşe Gereksinim analizi
  1.1 done P1 [] Paydaş görüşmeleri
  1.2 done P0 [] Regülasyon incelemesi (BDDK, PCI-DSS)

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 
-from .lexer import BppError, Cursor
+from .lexer import BLOCK_RE, MD_HEADER, BppError, Cursor
 
 _COUNT_RE = re.compile(r"\[(\d+)\]")
 
@@ -39,54 +39,103 @@ def _set_path(obj: dict, path: tuple, v, line):
 
 
 class _Line:
-    __slots__ = ("depth", "text", "no")
+    __slots__ = ("depth", "text", "no", "idx")
 
-    def __init__(self, depth, text, no):
-        self.depth, self.text, self.no = depth, text, no
+    def __init__(self, depth, text, no, idx=-1):
+        self.depth, self.text, self.no, self.idx = depth, text, no, idx
 
 
-def decode(text: str):
-    """Decode .bpp text into Python/JSON values."""
+HEADERS = ("bpp1", "bpp2", "bpp3", "bpp4")
+
+
+def _head(text: str):
+    """(version, raw lines, index of the first body line); version 0 = Markdown source."""
     raw = text.split("\n")
-    lines: list[_Line] = []
-    version = 0
-    for no, ln in enumerate(raw, 1):
+    for idx, ln in enumerate(raw):
         if ln.endswith("\r"):
             ln = ln[:-1]
         stripped = ln.lstrip(" ")
         if not stripped or stripped.startswith("#"):
             continue
-        if not version:
-            if stripped not in ("bpp1", "bpp2", "bpp3"):
-                raise BppError("missing 'bpp3' header", no)
-            version = int(stripped[3])
-            continue
-        lines.append(_Line(len(ln) - len(stripped), stripped, no))
+        if stripped == MD_HEADER:
+            return 0, raw, idx + 1
+        if stripped not in HEADERS:
+            raise BppError("missing 'bpp4' header", idx + 1)
+        return int(stripped[3]), raw, idx + 1
+    raise BppError("missing 'bpp4' header")
+
+
+def md_source(text: str) -> str | None:
+    """The Markdown text of a `bpp4 md` file (SPEC §7.2), or None for any other file."""
+    version, _, start = _head(text)
+    if version:
+        return None
+    parts = text.split("\n", start)
+    return parts[start] if len(parts) > start else ""
+
+
+def decode(text: str):
+    """Decode .bpp text into Python/JSON values."""
+    version, raw, start = _head(text)
     if not version:
-        raise BppError("missing 'bpp3' header")
-    return _Dec(lines, version).document()
+        from .markdown import md_to_tree
+        return md_to_tree(md_source(text))
+    return _Dec(raw, start, version).document()
 
 
 class _Dec:
-    def __init__(self, lines: list[_Line], version: int = 2):
-        self.L = lines
+    def __init__(self, raw: list[str], start: int, version: int = 2):
+        self.raw = raw
         self.version = version
-        self.i = 0
+        self.i = start      # index into raw of the next unread line
+        self.bpos = start   # where the next `|N` block of the current line begins
         self.refs: list = []
+
+    # -- lines -------------------------------------------------------------------
+    # Blank and comment lines are skipped when looking for the next logical line,
+    # but `|N` blocks are read straight from `raw`, so they may contain anything.
+    def line_at(self, j: int) -> _Line | None:
+        while j < len(self.raw):
+            ln = self.raw[j]
+            if ln.endswith("\r"):
+                ln = ln[:-1]
+            stripped = ln.lstrip(" ")
+            if stripped and not stripped.startswith("#"):
+                return _Line(len(ln) - len(stripped), stripped, j + 1, j)
+            j += 1
+        return None
+
+    def peek(self) -> _Line | None:
+        return self.line_at(self.i)
+
+    def take(self) -> _Line:
+        ln = self.line_at(self.i)
+        self.i = self.bpos = ln.idx + 1
+        return ln
+
+    def block(self, n: int) -> str:
+        """The n raw lines after the current line (and after its earlier blocks)."""
+        if n < 1 or self.bpos + n > len(self.raw):
+            raise BppError(f"block |{n} runs past the end of the file", self.bpos)
+        out = [ln[:-1] if ln.endswith("\r") else ln for ln in self.raw[self.bpos:self.bpos + n]]
+        self.bpos += n
+        self.i = self.bpos
+        return "\n".join(out)
 
     # -- helpers ---------------------------------------------------------------
     def cur(self, ln: _Line, start: int = 0) -> Cursor:
-        c = Cursor(ln.text, self.refs, ln.no)
+        c = Cursor(ln.text, self.refs, ln.no, self.block if self.version >= 4 else None)
         c.i = start
         return c
 
-    def depth_at(self, i: int) -> int:
-        return self.L[i].depth if i < len(self.L) else -1
+    def depth_at(self) -> int:
+        ln = self.peek()
+        return ln.depth if ln else -1
 
     # -- document ----------------------------------------------------------------
     def document(self):
-        while self.i < len(self.L) and self.L[self.i].text.startswith("&"):
-            ln = self.L[self.i]
+        while self.peek() is not None and self.peek().text.startswith("&"):
+            ln = self.take()
             m = re.match(r"&(\d+) ", ln.text)
             if not m or ln.depth or int(m.group(1)) != len(self.refs):
                 raise BppError("bad dictionary definition", ln.no)
@@ -95,23 +144,22 @@ class _Dec:
             if not isinstance(v, str) or not c.eof():
                 raise BppError("dictionary value must be a string", ln.no)
             self.refs.append(v)
-            self.i += 1
-        if self.i >= len(self.L):
+        first = self.peek()
+        if first is None:
             raise BppError("empty document")
-        first = self.L[self.i]
         if first.depth:
             raise BppError("unexpected indentation", first.no)
-        if self.i == len(self.L) - 1:
-            v = self._root_inline(first)
-            if v is not _NO:
-                self.i += 1
-                return v
-        if first.text.startswith("["):
+        if self.version >= 4 and BLOCK_RE.fullmatch(first.text):
+            self.take()
+            v = self.block(int(first.text[1:]))  # a root string written as a block
+        elif self.line_at(first.idx + 1) is None and (v := self._root_inline(first)) is not _NO:
+            self.take()
+        elif first.text.startswith("["):
             v = self.keyless(first, 0)
         else:
             v = self.object(0)
-        if self.i < len(self.L):
-            raise BppError("unexpected content", self.L[self.i].no)
+        if self.peek() is not None:
+            raise BppError("unexpected content", self.peek().no)
         return v
 
     def _root_inline(self, ln: _Line):
@@ -133,15 +181,14 @@ class _Dec:
     # -- objects -----------------------------------------------------------------
     def object(self, d: int) -> dict:
         obj: dict = {}
-        while self.i < len(self.L):
-            ln = self.L[self.i]
+        while (ln := self.peek()) is not None:
             if ln.depth < d:
                 break
             if ln.depth > d:
                 raise BppError("unexpected indentation", ln.no)
             if ln.text.startswith("- ") or ln.text == "-":
                 raise BppError("list item outside a list", ln.no)
-            self.i += 1
+            self.take()
             k, v = self.entry(ln, 0, d)
             obj[k] = v
         return obj
@@ -152,7 +199,7 @@ class _Dec:
         key = c.key()
         rest = ln.text[c.i:]
         if rest == "":
-            if self.depth_at(self.i) != d + 1:
+            if self.depth_at() != d + 1:
                 raise BppError(f"key {key!r} has no value", ln.no)
             return key, self.object(d + 1)
         if rest[0] == " ":
@@ -162,29 +209,29 @@ class _Dec:
                 raise BppError("trailing characters", ln.no)
             return key, v
         if rest[0] == "[":
-            return key, self.block(rest, ln, d)
+            return key, self.array(rest, ln, d, key)
         raise BppError(f"expected space after key {key!r}", ln.no)
 
     # -- arrays ------------------------------------------------------------------
     def keyless(self, ln: _Line, d: int):
         """A line at depth d beginning with '[': header `[N]...` or inline list."""
         h = _header(ln.text)
-        if h and (h[1] or self._items_follow(d)):
-            self.i += 1
-            return self.block(ln.text, ln, d)
+        if h and (h[1] or self._items_follow(ln, d)):
+            self.take()
+            return self.array(ln.text, ln, d)
+        self.take()
         c = self.cur(ln)
         v = c.inline_list()
         if not c.eof():
             raise BppError("trailing characters", ln.no)
-        self.i += 1
         return v
 
-    def _items_follow(self, d: int) -> bool:
-        j = self.i + 1
-        return j < len(self.L) and self.L[j].depth == d and (
-            self.L[j].text.startswith("- ") or self.L[j].text == "-")
+    def _items_follow(self, ln: _Line, d: int) -> bool:
+        nxt = self.line_at(ln.idx + 1)
+        return nxt is not None and nxt.depth == d and (
+            nxt.text.startswith("- ") or nxt.text == "-")
 
-    def block(self, head: str, ln: _Line, d: int) -> list:
+    def array(self, head: str, ln: _Line, d: int, key: str | None = None) -> list:
         h = _header(head)
         if not h:
             raise BppError("bad array header", ln.no)
@@ -192,14 +239,15 @@ class _Dec:
         if not rest:
             return self.items(n, d, ln)
         c = self.cur(_Line(0, rest, ln.no))
-        spec = self._spec(c)
+        spec = self._spec(c, key)
         if not c.eof():
             raise BppError("bad array header", ln.no)
         if spec.child is None and not spec.optional and (len(spec.cols) == 1 or spec.delim == ","):
             return self.table(n, spec, d, ln)
         return self.outline(n, spec, d, ln)
 
-    def _spec(self, c: Cursor) -> _Spec:
+    def _spec(self, c: Cursor, key: str | None) -> _Spec:
+        """Column spec; `key` is the key its rows are stored under (None: keyless)."""
         dotted = self.version >= 3
         c.expect("{")
         cols = []
@@ -234,18 +282,22 @@ class _Dec:
         child = sub = None
         if c.peek() == ">":
             c.i += 1
-            child = c.segment() if dotted else c.key()
+            if self.version >= 4 and c.peek() in ("{", ""):
+                if key is None:  # bpp4: a bare `>` repeats the table's own key
+                    c.err("'>' without a name needs a keyed table")
+                child = key
+            else:
+                child = c.segment() if dotted else c.key()
             if dotted and c.peek() == "{":
-                sub = self._spec(c)
+                sub = self._spec(c, child)
         return _Spec(cols, delim or ",", child, sub)
 
     def table(self, n: int, spec: _Spec, d: int, ln: _Line) -> list:
         rows = []
         for _ in range(n):
-            if self.i >= len(self.L) or self.L[self.i].depth != d:
+            if self.depth_at() != d:
                 raise BppError(f"expected {n} table rows", ln.no)
-            r = self.L[self.i]
-            self.i += 1
+            r = self.take()
             c = self.cur(r)
             obj: dict = {}
             for j, p in enumerate(spec.order):
@@ -314,15 +366,14 @@ class _Dec:
 
         def rows_at(depth: int, count, sp: _Spec) -> list:
             out = []
-            while self.i < len(self.L) and (count is None or len(out) < count):
-                r = self.L[self.i]
+            while (r := self.peek()) is not None and (count is None or len(out) < count):
                 if r.depth < depth:
                     break
                 if r.depth > depth:
                     raise BppError("unexpected indentation", r.no)
-                self.i += 1
+                self.take()
                 obj = row(r, sp)
-                if sp.child is not None and self.depth_at(self.i) == depth + 1:
+                if sp.child is not None and self.depth_at() == depth + 1:
                     if sp.child in obj:
                         raise BppError("child rows after child=[]", r.no)
                     obj[sp.child] = rows_at(depth + 1, None, sp.sub or sp)
@@ -342,24 +393,25 @@ class _Dec:
     def items(self, n: int, d: int, ln: _Line) -> list:
         out = []
         for _ in range(n):
-            if self.i >= len(self.L) or self.L[self.i].depth != d:
+            if self.depth_at() != d:
                 raise BppError(f"expected {n} list items", ln.no)
-            it = self.L[self.i]
+            it = self.take()
             if not it.text.startswith("- "):
                 raise BppError("expected '- ' list item", it.no)
-            self.i += 1
             out.append(self.item(it, d))
         return out
 
     def item(self, it: _Line, d: int):
         body = it.text[2:]
-        sub = _Line(d + 1, body, it.no)
+        sub = _Line(d + 1, body, it.no, it.idx)
+        if self.version >= 4 and BLOCK_RE.fullmatch(body):
+            return self.block(int(body[1:]))
         if body.startswith("["):
             h = _header(body)
-            if h and (h[1] or (
-                    self.i < len(self.L) and self.L[self.i].depth == d + 1
-                    and self.L[self.i].text.startswith("- "))):
-                return self.block(body, sub, d + 1)
+            nxt = self.peek()
+            if h and (h[1] or (nxt is not None and nxt.depth == d + 1
+                               and nxt.text.startswith("- "))):
+                return self.array(body, sub, d + 1)
             c = self.cur(sub)
             v = c.inline_list()
             if not c.eof():
@@ -375,7 +427,7 @@ class _Dec:
             key, rest = None, None
         if key is not None:
             is_entry = (rest.startswith(" ") or rest.startswith("[")
-                        or (rest == "" and self.depth_at(self.i) == d + 2))
+                        or (rest == "" and self.depth_at() == d + 2))
             if is_entry:
                 k, v = self.entry(sub, 0, d + 1)
                 obj = {k: v}
