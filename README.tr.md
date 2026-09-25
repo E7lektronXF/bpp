@@ -35,13 +35,14 @@ yeniden açın.
 ### 2. bpp'yi kurun (tek komut)
 
 ```bash
-pip install https://github.com/E7lektronXF/bpp/archive/HEAD.zip
+pip install bpp-format
 ```
 
-Bu komut kodu GitHub'dan indirip kurar; git gerekmez. Windows'ta `pip` bulunamazsa
-`py -m pip install ...`, macOS/Linux'ta `python3 -m pip install ...` yazın.
+Windows'ta `pip` bulunamazsa `py -m pip install ...`, macOS/Linux'ta `python3 -m pip install ...`
+yazın.
 
-> ⚠️ `pip install bpp` **yazmayın**. PyPI'daki `bpp` adlı paket bu proje değil, başka bir paket.
+> ⚠️ Paketin adı **`bpp-format`**; komut ve Python'daki `import` adı `bpp`. `pip install bpp`
+> **yazmayın**: PyPI'daki `bpp` adlı paket bu proje değil, başka bir paket.
 
 Kesin token sayımı da görmek isterseniz (isteğe bağlı):
 
@@ -165,11 +166,11 @@ bpp.dump(veri, "config.bpp")     # biçimi uzantıdan seçer
 |---|---|
 | `bpp: command not found` / `'bpp' is not recognized` | `python -m bpp ...` kullanın ya da terminali yeniden açın. |
 | `pip: command not found` | Windows: `py -m pip install ...` · macOS/Linux: `python3 -m pip install ...` |
-| `error: externally-managed-environment` (yeni macOS/Linux) | `pipx install https://github.com/E7lektronXF/bpp/archive/HEAD.zip` ya da bir sanal ortam kullanın: `python3 -m venv .venv && . .venv/bin/activate` ve 2. adımı tekrarlayın. |
+| `error: externally-managed-environment` (yeni macOS/Linux) | `pipx install bpp-format` ya da bir sanal ortam kullanın: `python3 -m venv .venv && . .venv/bin/activate` ve 2. adımı tekrarlayın. |
 | `cannot infer format` | Dosya uzantısı `.json .yaml .yml .csv .md .bpp` olmalı. |
 | `... exists; use -o ...` | Geri çevirirken orijinal dosyanın üzerine yazılmasın diye durdu. `-o başka_ad.json` verin. |
 
-Kaldırmak için: `pip uninstall bpp`.
+Güncellemek için: `pip install --upgrade bpp-format`. Kaldırmak için: `pip uninstall bpp-format`.
 
 ## Nasıl görünüyor?
 

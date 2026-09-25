@@ -25,7 +25,7 @@ no API token is stored anywhere.
 4. Check https://pypi.org/project/bpp-format/ and try `pip install bpp-format` in a clean
    virtualenv.
 
-After the first release, the README's install command can become `pip install bpp-format`.
+The first release (0.3.0) was published on 2026-09-25; the READMEs install with `pip install bpp-format`.
 
 ## Manual alternative
 

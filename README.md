@@ -55,15 +55,16 @@ TOON. The full tables, the method and the cases where bpp wins by less are in
 You need Python 3.9 or newer (check with `python --version`). Then run:
 
 ```bash
-pip install https://github.com/E7lektronXF/bpp/archive/HEAD.zip
+pip install bpp-format
 ```
 
-This installs straight from GitHub. You don't need git. If `pip` isn't found, use `python3 -m pip`
-on macOS/Linux or `py -m pip` on Windows.
+If `pip` isn't found, use `python3 -m pip` on macOS/Linux or `py -m pip` on Windows.
 
-> ⚠️ **Don't run `pip install bpp`.** The package called `bpp` on PyPI is an unrelated project.
+> ⚠️ The package is called **`bpp-format`**; the command and the Python import are `bpp`.
+> `pip install bpp` installs an unrelated project.
 
-Optional: `pip install tiktoken` to get exact token counts instead of estimates.
+Optional: `pip install "bpp-format[stats]"` also installs tiktoken, for exact token counts instead
+of estimates.
 
 ```bash
 bpp --version      # bpp 0.3.0
@@ -260,12 +261,12 @@ bpp stats data.json [--markdown]
 |---|---|
 | `bpp: command not found` | Use `python -m bpp ...`, or open a new terminal. |
 | `pip: command not found` | `python3 -m pip install ...` (macOS/Linux) or `py -m pip install ...` (Windows). |
-| `externally-managed-environment` | `pipx install https://github.com/E7lektronXF/bpp/archive/HEAD.zip`, or install inside a virtualenv (`python3 -m venv .venv && . .venv/bin/activate`). |
+| `externally-managed-environment` | `pipx install bpp-format`, or install inside a virtualenv (`python3 -m venv .venv && . .venv/bin/activate`). |
 | `cannot infer format` | Use one of these extensions: `.json .yaml .yml .csv .md .bpp`. |
 | `... exists; use -o ...` | bpp refused to overwrite your original file. Pick another name with `-o`. |
 
-Upgrade with `pip install --upgrade https://github.com/E7lektronXF/bpp/archive/HEAD.zip`. Uninstall
-with `pip uninstall bpp`.
+Upgrade with `pip install --upgrade bpp-format`. Uninstall
+with `pip uninstall bpp-format`.
 
 ## Development
 
