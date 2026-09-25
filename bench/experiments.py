@@ -13,6 +13,7 @@ import json
 import re
 import subprocess
 import sys
+from contextlib import contextmanager
 from dataclasses import dataclass, replace
 from pathlib import Path
 
@@ -419,10 +420,135 @@ def main():
         "plan-nested ' '": proto(plan, kv=" "),
     }, "Δ% only meaningful between rows of the same document."))
 
+    out += bpp4_experiments(plan)
+
     res = ROOT / "bench/results/experiments.md"
     res.parent.mkdir(parents=True, exist_ok=True)
     res.write_text("\n".join(out), encoding="utf-8")
     print("\n".join(out))
+
+
+# --------------------------------------------------------------------------
+# bpp4 (Markdown) experiments.  These use the real encoder with one rule
+# switched off at a time, on a frozen corpus: bench/corpus/ holds this repo's
+# README, SPEC, BENCHMARK and RELEASING as of v0.3.0 plus the example plan, so
+# the numbers do not move when the documents themselves are edited.
+# --------------------------------------------------------------------------
+
+CORPUS = ["README.md", "SPEC.md", "BENCHMARK.md", "RELEASING.md", "project_plan.md"]
+
+
+@contextmanager
+def patched(*changes):
+    """Temporarily set (object, attribute, value) triples."""
+    old = [(o, a, getattr(o, a)) for o, a, _ in changes]
+    for o, a, v in changes:
+        setattr(o, a, v)
+    try:
+        yield
+    finally:
+        for o, a, v in old:
+            setattr(o, a, v)
+
+
+def table_docs(title: str, variants: dict, note: str = "") -> str:
+    """Rows = variants (name -> fn(source) -> text), columns = corpus files, per counter."""
+    srcs = {f: (ROOT / "bench/corpus" / f).read_text(encoding="utf-8") for f in CORPUS}
+    out = f"### {title}\n\n" + (note + "\n\n" if note else "")
+    for cname, fn in COUNTERS.items():
+        out += f"{cname}:\n\n| variant | " + " | ".join(CORPUS) + " | total |\n"
+        out += "|---|" + "---:|" * (len(CORPUS) + 1) + "\n"
+        for vname, make in variants.items():
+            ns = [fn(make(srcs[f])) for f in CORPUS]
+            out += f"| {vname} | " + " | ".join(map(str, ns)) + f" | {sum(ns)} |\n"
+        out += "\n"
+    return out
+
+
+def bpp4_experiments(plan) -> list[str]:
+    import bpp.encoder as E
+    import bpp.estimate as ES
+    import bpp.lexer as L
+    import bpp.markdown as M
+    from bpp import encode, encode_md
+
+    def tree(src, **kw):
+        return encode(M.md_to_tree(src), **kw)
+
+    old_piece = re.compile(ES._PIECE.pattern.replace('(?![?\\"]=|=\\|)', "").replace(r"|\n+|", r"|\n|"))
+    assert old_piece.pattern != ES._PIECE.pattern
+    orig_header = E._Spec.header
+    orig_quote = L.needs_quote
+
+    def with_(*changes, md=True, **kw):
+        def run(src):
+            with patched(*changes):
+                return tree(src, **kw) if md else encode(src, **kw)
+        return run
+
+    no_blocks = (E, "block_ok", lambda s: False)
+    all_blocks = (E, "block_gain", lambda s: 0)
+    named_child = (E._Spec, "header", lambda self, key: orig_header(self, None))
+    star_quoted = (L, "needs_quote", lambda s, ctx="value", strmode=False:
+                   s[:1] == "*" or orig_quote(s, ctx, strmode))
+    tree_only = (E, "_plans", lambda arr, k, f=E._plans: f(arr, k)[:1])
+    old_est = (ES, "_PIECE", old_piece)
+    out = []
+    out.append(table_docs("E10 Multi-line strings: JSON string vs `|N` block (bpp4)", {
+        "all quoted (bpp3)": with_(no_blocks),
+        "all blocks": with_(all_blocks),
+        "block when estimated gain >= 0 (chosen)": with_(),
+    }, "Whole documents, encoded as trees with every other bpp4 rule on."))
+    out.append(table_docs("E11 Markdown soft line breaks", {
+        "keep every line break (bpp3)": lambda src: encode(M.md_to_tree(src, join=False)),
+        "join item titles only": with_((M, "_join_soft", lambda lines: lines)),
+        "join item titles and note paragraphs (chosen)": with_(),
+    }))
+    out.append(table_docs("E12 Child key of a tree: `>steps` vs bare `>`", {
+        "`>steps` (bpp3)": with_(named_child),
+        "bare `>` (chosen)": with_(),
+    }))
+    out.append(table("E12b Bare `>` on the JSON plan (examples/plan.json)", {
+        "`>steps` (bpp3)": with_(named_child, md=False)(plan),
+        "bare `>` (chosen)": encode(plan),
+    }))
+    out.append(table_docs("E13 Strings starting with `*`: always quoted vs only `*n`", {
+        "quote every leading `*` (bpp3)": with_(star_quoted),
+        "quote only `*<digits>` (chosen)": with_(),
+    }))
+    out.append(table_docs("E14 Layout of Markdown trees and the estimator", {
+        "tree only, bpp3 estimator": with_(tree_only, old_est),
+        "tree or child table, bpp3 estimator": with_(old_est),
+        "tree or child table, bpp4 estimator (chosen)": with_(),
+    }, "bpp4 estimator: `?=`, `=|` and `\"=` stay two tokens, and a run of newlines is one. "
+       "The child table gives the top level (headings) its own columns, so a heading's note can "
+       "be positional (`|7 Title`) instead of keyed (`note=|7 Title`)."))
+    out.append(table_docs("E15 Markdown: source vs bpp, primers and the `bpp4 md` fallback", {
+        "Markdown source": lambda src: src,
+        "`bpp4 md` + source": lambda src: "bpp4 md\n" + src,
+        "bpp tree (no primer)": tree,
+        "bpp tree + JSON primer": lambda src: tree(src, primer=True),
+        "bpp tree + Markdown primer": lambda src: E._assemble(
+            *E._body(M.md_to_tree(src), True, False), True, markdown=True),
+        "encode_md (chosen)": encode_md,
+        "encode_md + primer (chosen)": lambda src: encode_md(src, primer=True),
+    }))
+    out.append(table("E16 Primer length (absolute tokens)", {
+        "bpp3 one-line primer": "# bpp3: JSON as 'key value' lines, 1-space indent nests. k[N]{a b.c}: N "
+        "rows, values in column order (b.c = key c of b), last one = rest of line; x? optional "
+        "(- = absent), x?= as x=v; >k: indented rows are k. \"...\" = JSON string, *n = &n.",
+        "bpp4 primer, project_plan.md": encode_md(
+            (ROOT / "bench/corpus/project_plan.md").read_text(encoding="utf-8"), primer=True
+        ).split("\n")[1],
+        "bpp4 primer, plan.json": encode(plan, primer=True).split("\n")[1],
+        "bpp4 primer, examples/quickstart.json": encode(
+            json.loads((ROOT / "examples/quickstart.json").read_text(encoding="utf-8")),
+            primer=True).split("\n")[1],
+        "bpp4 primer, every feature": E._primer([E._Raw("x"), "a[1]{x,y}", 'k[1]{a b.c? d?=}>e{f}>', '"'],
+                                                True, markdown=False),
+        "bpp4 3-line primer (--primer long)": E.PRIMER_LONG,
+    }, "The bpp4 one-line primer lists only the syntax the output uses (SPEC §8)."))
+    return out
 
 
 if __name__ == "__main__":

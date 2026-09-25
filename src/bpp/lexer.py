@@ -12,6 +12,10 @@ SPECIAL = {"null": None, "true": True, "false": False,
 _CTRL = re.compile(r"[\x00-\x1f\x7f]")
 BARE_KEY_RE = re.compile(r"[^\s\"\[\]{}=,:?>\x00-\x1f\x7f]+")
 BARE_SEG_RE = re.compile(r"[^\s\"\[\]{}=,:?>.\x00-\x1f\x7f]+")  # a column-path segment
+MD_HEADER = "bpp4 md"  # a Markdown document kept as its source text (SPEC §7.2)
+REF_RE = re.compile(r"\*[0-9]+")  # `*n`: dictionary reference
+BLOCK_RE = re.compile(r"\|[0-9]+")  # `|N`: a block string of N raw lines (bpp4, SPEC §2.2)
+_BLOCK_BAD = re.compile(r"[\x00-\x09\x0b-\x1f\x7f]")
 _KV_START = re.compile(r"(?:[^\s\"\[\]{}=,:?>]+|\"(?:[^\"\\]|\\.)*\")=")
 _DECODER = json.JSONDecoder()
 
@@ -55,8 +59,8 @@ def fmt_number(v) -> str:
 
 def needs_quote(s: str, ctx: str = "value", strmode: bool = False) -> bool:
     """Minimum-quoting rule (SPEC §2.1). ctx: value|cell|list|pos|item|last."""
-    if (not s or s != s.strip() or _CTRL.search(s) or s[0] in '"[{*&#'
-            or s in SPECIAL):
+    if (not s or s != s.strip() or _CTRL.search(s) or s[0] in '"[{&#'
+            or s in SPECIAL or REF_RE.fullmatch(s) or BLOCK_RE.fullmatch(s)):
         return True
     if not strmode and NUM_RE.fullmatch(s):
         return True
@@ -87,8 +91,13 @@ def fmt_scalar(v, ctx: str = "value", strmode: bool = False) -> str:
     return jstr(v) if needs_quote(v, ctx, strmode) else v
 
 
+def block_ok(s: str) -> bool:
+    """Can s be written as a `|N` block string? (multi-line, no CR or other control characters)"""
+    return "\n" in s and not _BLOCK_BAD.search(s)
+
+
 def fmt_key(k: str) -> str:
-    if BARE_KEY_RE.fullmatch(k) and k[0] not in "-#&*":
+    if BARE_KEY_RE.fullmatch(k) and k[0] not in "-#&*" and not BLOCK_RE.fullmatch(k):
         return k
     return jstr(k)
 
@@ -129,10 +138,10 @@ def parse_bare(tok: str, strmode: bool = False):
 
 
 class Cursor:
-    """Scans one line of text; `refs` resolves `*n`."""
+    """Scans one line of text; `refs` resolves `*n`, `blocks(n)` reads a `|N` block (bpp4)."""
 
-    def __init__(self, text: str, refs: list, line: int | None):
-        self.s, self.i, self.refs, self.line = text, 0, refs, line
+    def __init__(self, text: str, refs: list, line: int | None, blocks=None):
+        self.s, self.i, self.refs, self.line, self.blocks = text, 0, refs, line, blocks
 
     def err(self, msg):
         raise BppError(msg, self.line)
@@ -186,15 +195,17 @@ class Cursor:
             out.append(self.segment())
         return tuple(out)
 
-    def resolve(self, tok: str, strmode: bool):
-        if tok.startswith("*") and tok[1:].isdigit():
+    def resolve(self, tok: str, strmode: bool, block: bool = True):
+        if block and self.blocks and BLOCK_RE.fullmatch(tok):
+            return self.blocks(int(tok[1:]))
+        if REF_RE.fullmatch(tok):
             idx = int(tok[1:])
             if idx >= len(self.refs):
                 self.err(f"undefined reference {tok}")
             return self.refs[idx]
         return parse_bare(tok, strmode)
 
-    def token(self, stops: str, strmode: bool = False):
+    def token(self, stops: str, strmode: bool = False, block: bool = True):
         """A scalar ending before any char in `stops` (or end of line)."""
         if self.peek() == '"':
             return self.jstring()
@@ -205,7 +216,7 @@ class Cursor:
         if not tok:
             self.err(f"empty value at column {self.i + 1}")
         self.i = j
-        return self.resolve(tok, strmode)
+        return self.resolve(tok, strmode, block)
 
     def inline_list(self, strmode: bool = False) -> list:
         self.expect("[")
@@ -214,7 +225,7 @@ class Cursor:
             self.i += 1
             return out
         while True:
-            out.append(self.token(",]", strmode))
+            out.append(self.token(",]", strmode, block=False))
             c = self.peek()
             self.i += 1
             if c == "]":

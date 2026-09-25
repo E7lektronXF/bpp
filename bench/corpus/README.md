@@ -21,7 +21,7 @@ token counts, with no install needed.
 ```
 JSON, pretty-printed (146 tokens)                  bpp (53 tokens)
 
-{                                                  bpp4
+{                                                  bpp3
   "store": "Downtown Branch",                      store Downtown Branch
   "orders": [                                      orders[3]{id product qty price customer}
     {"id": 1, "customer": "Alice Johnson",         1 Headphones 2 79.9 Alice Johnson
@@ -38,11 +38,11 @@ Token counts per format for six example files (o200k tokenizer; fewer is better)
 |---|---:|---:|---:|---:|---:|---:|---|
 | 60×10 table (CSV) | 5538 | 3562 | 4388 | 2277 | – | **2042** | −6% vs CSV |
 | nested config (YAML) | 601 | 365 | 443 | 399 | – | **323** | −12% vs minified JSON |
-| project plan with deps (JSON) | 1609 | 990 | 1212 | 1228 | – | **634** | −36% vs minified JSON |
-| Markdown checklist plan | 1445 | 990 | 1083 | 1024 | 837 | **758** | −9% vs Markdown |
+| project plan with deps (JSON) | 1609 | 990 | 1212 | 1228 | – | **636** | −36% vs minified JSON |
+| Markdown checklist plan | 1501 | 1025 | 1119 | 1093 | 837 | **792** | −5% vs Markdown |
 | API response with nested objects | 3524 | 2231 | 2636 | 2276 | – | **1151** | −48% vs minified JSON |
 | repetitive logs | 5629 | 4109 | 4587 | 3348 | – | **1857** | −42% vs CSV |
-| **total** | 18346 | 12247 | 14349 | 10552 | | **6765** | **−63% vs JSON, −36% vs TOON** |
+| **total** | 18402 | 12282 | 14385 | 10621 | | **6801** | **−63% vs JSON, −36% vs TOON** |
 
 Anthropic's published Claude tokenizer (`claude2`) shows the same picture: −62% vs JSON, −36% vs
 TOON. The full tables, the method and the cases where bpp wins by less are in
@@ -67,7 +67,7 @@ Optional: `pip install "bpp-format[stats]"` also installs tiktoken, for exact to
 of estimates.
 
 ```bash
-bpp --version      # bpp 0.4.0
+bpp --version      # bpp 0.3.0
 ```
 
 ### 2. Convert a file
@@ -83,16 +83,15 @@ This works with `.json`, `.yaml`, `.csv` and `.md` files. Want a sample to try?
 ### 3. Give it to your LLM
 
 Open `quickstart.bpp`, then paste it into ChatGPT, Claude or your prompt template. If the model
-hasn't seen the format before, add `--primer`. It prepends a one-line explanation of the syntax
-the file uses (40 tokens here, at most ~110):
+hasn't seen the format before, add `--primer`. It prepends a one-line explanation (~85 tokens):
 
 ```bash
 bpp quickstart.json --primer -o -     # print to the terminal instead of writing a file
 ```
 
 ```
-bpp4
-# bpp4: JSON as 'key value' lines, 1-space indent nests. k[N]{a b}: N rows, values in column order, last one = rest of line.
+bpp3
+# bpp3: JSON as 'key value' lines, 1-space indent nests. k[N]{a b}: N rows of values in column order, last column = rest of line; x? = optional ('-' if absent), x?= columns appear as x=v. "..." = JSON string, *n = &n.
 store Downtown Branch
 ...
 ```
@@ -115,10 +114,10 @@ JSON (indent 2)    434    146      136            +0.0%              +0.0%
 JSON (minified)    271     82       81           -43.8%             -40.4%
 YAML               261    102       82           -30.1%             -39.7%
 bpp                163     53       48           -63.7%             -64.7%
-bpp + primer       288     93       91           -36.3%             -33.1%
+bpp + primer       402    137      137            -6.2%              +0.7%
 ```
 
-On a file this small the primer still costs more than minified JSON. Use it on larger inputs.
+On a file this small the primer eats most of the savings. Use it on larger inputs.
 
 ### From Python
 
@@ -130,13 +129,12 @@ data = bpp.loads(text)          # bpp text -> Python object
 
 data = bpp.load("config.yaml")  # reads .json .yaml .csv .md .bpp
 bpp.dump(data, "config.bpp")    # format chosen by extension
-text = bpp.encode_md(markdown)  # Markdown text -> bpp (or the source itself if that is shorter)
 ```
 
 ## The format in one minute
 
 ```
-bpp4
+bpp3
 server
  host 0.0.0.0
  port 8080
@@ -157,18 +155,16 @@ regions [TR,DE,NL]
   means the rows indented under a row are its `items`, with their own columns.
 * **Optional columns:** `x?` sits in place, with `-` when absent. `x?=` appears only when present,
   as `x=value`.
-* **Trees:** `>steps` means rows indented under a row are its children, and a bare `>` means the
-  same key as the table (`steps[6]{...}>`). This is how plans are written.
-* **Multi-line text:** `|3` stands for the next 3 lines, taken as they are: no quotes, no `\n`
-  escapes.
+* **Trees:** `>steps` means rows indented under a row are its children. This is how plans are
+  written.
 * **Dictionary:** a long value repeated many times is written once as `&0 value` and referenced
   as `*0`, in YAML anchor style. It is used only when it measurably saves tokens.
 * **Strings** are quoted JSON-style only when they would be ambiguous. Unicode stays raw UTF-8.
 
-A plan with dependencies (`examples/plan.json`: 1609 tokens as JSON, 634 as bpp):
+A plan with dependencies (`examples/plan.json`: 1609 tokens as JSON, 636 as bpp):
 
 ```
-steps[6]{id:str status priority deps:str owner?= note?= title}>
+steps[6]{id:str status priority deps:str owner?= note?= title}>steps
 1 done P1 [] owner=Ayşe Gereksinim analizi
  1.1 done P1 [] Paydaş görüşmeleri
  1.2 done P0 [] Regülasyon incelemesi (BDDK, PCI-DSS)
@@ -187,21 +183,16 @@ ORD-2026-00001 Ankara paid standard 2897.68 *4 Ayşe Arslan
  SKU-940 1 1890.88 Laptop Standı
 ```
 
-A Markdown checklist (`examples/project_plan.md`: 837 tokens as Markdown, 758 as bpp). Headings
-and nested lists become a tree; `[ ]` `[x]` `[/]` `[-]` become `todo` `done` `doing` `cancelled`,
-and wrapped lines are joined:
+A Markdown checklist (`examples/project_plan.md`: 837 tokens as Markdown, 792 as bpp). Headings
+and nested lists become a tree; `[ ]` `[x]` `[/]` `[-]` become `todo` `done` `doing` `cancelled`:
 
 ```
-steps[5]{title}>{status? note?= title}>
-Keşif ve envanter
- done Mevcut iş akışlarının envanteri Toplam 312 Airflow DAG'i, 48 Spark işi ve 17 Hive veritabanı tespit edildi.
+steps[5]{status? note?= title}>steps
+- Keşif ve envanter
+ done note="Toplam 312 Airflow DAG'i, 48 Spark işi ve 17 Hive veritabanı tespit edildi." Mevcut iş akışlarının envanteri
  done Veri sahipleriyle görüşmeler
   done Pazarlama analitiği
 ```
-
-When the tree would be longer than the Markdown itself (short or prose-only files), `bpp x.md`
-writes `bpp4 md` and then the source unchanged. By the encoder's token estimate, a Markdown file
-never grows by more than that header line.
 
 The full grammar and the measurement behind each rule are in [SPEC.md](https://github.com/E7lektronXF/bpp/blob/main/SPEC.md).
 
@@ -217,8 +208,6 @@ encodings usually cost more tokens and hurt understanding. bpp saves tokens by:
    gain is positive.
 4. **Keeping structure explicit:** row counts (`[N]`), column names and indentation give the model
    a frame to read against.
-5. **Writing text as text.** Multi-line strings are raw lines (`|N`), not JSON strings full of
-   `\n` and `\"` escapes.
 
 ## Guarantees
 
@@ -226,9 +215,9 @@ encodings usually cost more tokens and hurt understanding. bpp saves tokens by:
 |---|---|
 | JSON / YAML | `loads(dumps(x)) == x`, types included (`1` ≠ `1.0`, `"42"` ≠ `42`, `null`). With `--keep-order`, the JSON text comes back identical, key order included. YAML comments and anchors are not data and are not kept. Dates stay strings. |
 | CSV | Cells and column order come back byte for byte. Numbers are typed only when writing them back gives the same text (`007` and `1.50` stay strings). |
-| Markdown | Structure is kept, formatting is not (soft line breaks are joined). Output is normalized Markdown that parses back to the same tree. A file kept as `bpp4 md` comes back byte for byte. |
+| Markdown | Structure is kept, formatting is not. Output is normalized Markdown that parses back to the same tree. |
 
-Backed by 240 tests: edge cases (empty containers, 80-level nesting, delimiters inside strings,
+Backed by 217 tests: edge cases (empty containers, 80-level nesting, delimiters inside strings,
 multi-line text, Unicode, number-like strings) and hypothesis property tests on random JSON, CSV,
 YAML and Markdown trees.
 
@@ -243,9 +232,7 @@ YAML and Markdown trees.
   Claude tokenizer. Current Claude models use a different tokenizer. Set `ANTHROPIC_API_KEY` and
   `bpp stats` adds real `count_tokens` numbers.
 * **Small gains in some cases:** plain flat tables are only ~6% smaller than CSV on o200k (17% on
-  claude2). On prose-heavy Markdown the tree saves 0.4–2% (this repository's README, SPEC,
-  BENCHMARK and RELEASING); the savings are in lists and checklists. The primer (40–110 tokens)
-  cancels the savings on documents of a few hundred tokens.
+  claude2). The primer (~85 tokens) cancels the savings on documents of a few hundred tokens.
 
 ## Command reference
 
@@ -262,7 +249,7 @@ bpp stats data.json [--markdown]
 
 | option | effect |
 |---|---|
-| `--primer` | Prepend a format explanation (`short`: only the syntax used, 40–110 tokens; `long`: ~155 tokens). |
+| `--primer` | Prepend a format explanation (`short` ~85, `long` ~135 tokens). |
 | `--no-refs` | Disable the `&n`/`*n` dictionary. |
 | `--keep-order` | Never reorder keys. By default a table may move a free-text column such as `title` to the end of each row, which changes JSON key order but not the data. Always on for CSV input. |
 | `-o -` | Write to stdout. |
@@ -286,7 +273,7 @@ with `pip uninstall bpp-format`.
 ```bash
 git clone https://github.com/E7lektronXF/bpp.git && cd bpp
 pip install -e ".[dev]"        # + pytest, hypothesis, tiktoken
-pytest -q                      # 240 tests
+pytest -q                      # 217 tests
 python bench/run_tokens.py     # regenerate the token benchmark
 python bench/experiments.py    # the design experiments behind SPEC.md
 python bench/run_qa.py         # comprehension benchmark (needs ANTHROPIC_API_KEY)

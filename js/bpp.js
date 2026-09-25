@@ -1,4 +1,4 @@
-// bpp.js: JavaScript port of the bpp encoder/decoder (format bpp2).
+// bpp.js: JavaScript port of the bpp encoder/decoder (format bpp4).
 //
 // Output is byte-identical to the Python package (checked by
 // js/test/parity.mjs). Objects are Maps so key order survives integer-like
@@ -23,16 +23,15 @@ export class BppError extends Error {
 
 class Ref { constructor(idx) { this.idx = idx; } }
 
-export const HEADER = 'bpp3';
-export const PRIMER = "# bpp3: JSON as 'key value' lines, 1-space indent nests. k[N]{a b.c}: N rows, values " +
-  "in column order (b.c = key c of b), last one = rest of line; x? optional (- = absent), " +
-  'x?= as x=v; >k: indented rows are k. "..." = JSON string, *n = &n.';
+export const HEADER = 'bpp4';
+export const MD_HEADER = 'bpp4 md';
 export const PRIMER_LONG =
-  "# bpp3 = JSON data. Lines are 'key value'; a bare 'key' opens a nested object (1-space indent). [a,b] = list.\n" +
+  "# bpp4 = JSON data. Lines are 'key value'; a bare 'key' opens a nested object (1-space indent). [a,b] = list.\n" +
   '# k[N]{a b.c d}: N rows, values space-separated in column order, b.c = key c inside object b, ' +
   'last column = rest of line;\n' +
-  "# x? = optional, '-' if absent; x?= written as x=v; >kids: indented rows are kids, >kids{...} gives " +
-  "them their own columns. {a,b}: comma rows. k[N]: N '- ' items. \"...\" = JSON string. *n = &n value.";
+  "# x? = optional, '-' if absent; x?= written as x=v; >kids: indented rows are kids (a bare > keeps " +
+  "the table's key), >kids{...} gives them their own columns. {a,b}: comma rows. k[N]: N '- ' items. " +
+  '"..." = JSON string. |N = the next N lines as a string. *n = &n value.';
 const CHILD_KEYS = ['steps', 'children', 'subtasks', 'tasks', 'items', 'nodes'];
 const MIN_REF_LEN = 8;
 
@@ -47,6 +46,9 @@ const BARE_KEY_RE = new RegExp(`[^${PYWS}"\\[\\]{}=,:?>\\x00-\\x1f\\x7f]+`, 'uy'
 const BARE_SEG_RE = new RegExp(`[^${PYWS}"\\[\\]{}=,:?>.\\x00-\\x1f\\x7f]+`, 'uy');
 const BARE_SEG_FULL = new RegExp(`^[^${PYWS}"\\[\\]{}=,:?>.\\x00-\\x1f\\x7f]+$`, 'u');
 const BARE_KEY_FULL = new RegExp(`^[^${PYWS}"\\[\\]{}=,:?>\\x00-\\x1f\\x7f]+$`, 'u');
+const REF_FULL = /^\*[0-9]+$/;
+const BLOCK_FULL = /^\|[0-9]+$/;
+const BLOCK_BAD = /[\x00-\x09\x0b-\x1f\x7f]/;
 const KV_START = new RegExp(`^(?:[^${PYWS}"\\[\\]{}=,:?>]+|"(?:[^"\\\\]|\\\\[^\\n])*")=`, 'u');
 const cpLen = (s) => { let n = 0; for (const _ of s) n++; return n; };
 const SPECIAL = new Map([['null', null], ['true', true], ['false', false],
@@ -107,7 +109,8 @@ function pyTruthy(v) {
 }
 
 function needsQuote(s, ctx = 'value', strmode = false) {
-  if (!s || pyStrip(s) !== s || CTRL.test(s) || '"[{*&#'.includes(s[0]) || SPECIAL.has(s)) return true;
+  if (!s || pyStrip(s) !== s || CTRL.test(s) || '"[{&#'.includes(s[0]) || SPECIAL.has(s) ||
+      REF_FULL.test(s) || BLOCK_FULL.test(s)) return true;
   if (!strmode && NUM_RE.test(s)) return true;
   switch (ctx) {
     case 'cell': return s.includes(',');
@@ -129,8 +132,11 @@ function fmtScalar(v, ctx = 'value', strmode = false) {
 }
 
 function fmtKey(k) {
-  return BARE_KEY_FULL.test(k) && !'-#&*'.includes(k[0]) ? k : jstr(k);
+  return BARE_KEY_FULL.test(k) && !'-#&*'.includes(k[0]) && !BLOCK_FULL.test(k) ? k : jstr(k);
 }
+
+/** Can s be written as a `|N` block string? (multi-line, no CR or other control characters) */
+const blockOk = (s) => s.includes('\n') && !BLOCK_BAD.test(s);
 
 /** A key inside a table header, where '.' separates path segments. */
 function fmtSeg(k) {
@@ -149,8 +155,8 @@ function fmtInline(v, ctx = 'value', strmode = false) {
 
 // --------------------------------------------------------------- estimator
 const PIECE = new RegExp(
-  ' ?[A-Za-z]+| ?(?:(?![A-Za-z])[\\p{L}\\p{Nl}\\p{No}])+| ?\\p{Nd}{1,3}|\\n| +' +
-  `|[^\\p{L}\\p{N}_${PYWS}]{1,2}|[^\\n]`, 'gu');
+  ' ?[A-Za-z]+| ?(?:(?![A-Za-z])[\\p{L}\\p{Nl}\\p{No}])+| ?\\p{Nd}{1,3}|\\n+| +' +
+  `|(?![?"]=|=\\|)[^\\p{L}\\p{N}_${PYWS}]{1,2}|[^\\n]`, 'gu');
 const IS_ALPHA = /^\p{L}$/u;
 
 /** Deterministic token estimate, identical to bpp/estimate.py. */
@@ -244,14 +250,19 @@ class Spec {
   constructor(order, required, keyed, smode, child, sub) {
     Object.assign(this, { order, required, keyed, smode, child, sub });
   }
-  header() {
+  /** `{cols}>child...`; `key` is the (formatted) key the rows are stored under. */
+  header(key) {
     const cols = this.order.map((p) => {
       const k = pathKey(p);
       return fmtPath(p) + (this.keyed.has(k) ? '?=' : this.required.has(k) ? '' : '?') +
         (this.smode.get(k) ? ':str' : '');
     }).join(' ');
     let out = '{' + cols + '}';
-    if (this.child !== null) out += '>' + fmtSeg(this.child) + (this.sub ? this.sub.header() : '');
+    if (this.child !== null) {
+      const child = fmtSeg(this.child);
+      out += '>' + (child === key ? '' : child);  // bpp4: a bare > keeps the key
+      if (this.sub) out += this.sub.header(child);
+    }
     return out;
   }
 }
@@ -272,24 +283,28 @@ function flatNode(x, skip) {
 }
 
 function plan(arr, keepOrder) {
-  if (!arr.length || !arr.every((x) => x instanceof Map && x.size)) return null;
+  const specs = plans(arr, keepOrder);
+  return specs.length ? specs[0] : null;
+}
+
+/** Lossless row-table specs for arr, best guess first: a tree and a child table (see Python _plans). */
+function plans(arr, keepOrder) {
+  if (!arr.length || !arr.every((x) => x instanceof Map && x.size)) return [];
   const seen = new Set();
   for (const ck of [...CHILD_KEYS, ...arr.flatMap((x) => [...x.keys()])]) {
     if (seen.has(ck)) continue;
     seen.add(ck);
     if (!arr.some((x) => pyTruthy(x.get(ck))) || !arr.every((x) => !x.has(ck) || isRows(x.get(ck)))) continue;
+    const specs = [];
     const nodes = treeNodes(arr, ck);
-    if (nodes !== null) {
-      const spec = planCols(arr, nodes, ck, null, keepOrder);
-      if (spec !== null) return spec;
-    }
+    if (nodes !== null) specs.push(planCols(arr, nodes, ck, null, keepOrder));
     const sub = plan(arr.flatMap((x) => (pyTruthy(x.get(ck)) ? x.get(ck) : [])), keepOrder);
-    if (sub !== null) {
-      const spec = planCols(arr, arr, ck, sub, keepOrder);
-      if (spec !== null) return spec;
-    }
+    if (sub !== null) specs.push(planCols(arr, arr, ck, sub, keepOrder));
+    const ok = specs.filter((sp) => sp !== null);
+    if (ok.length) return ok;
   }
-  return planCols(arr, arr, null, null, keepOrder);
+  const spec = planCols(arr, arr, null, null, keepOrder);
+  return spec === null ? [] : [spec];
 }
 
 function planCols(arr, nodes, child, sub, keepOrder) {
@@ -376,38 +391,49 @@ function orderedEq(a, b) {
   return a === b;
 }
 
-function renderRows(arr, spec, depth, lines) {
-  const last = spec.order[spec.order.length - 1];
-  for (const x of arr) {
-    const flat = new Map(flatNode(x, spec.child).map(([p, v]) => [pathKey(p), v]));
-    const parts = [];
-    for (const p of spec.order.slice(0, -1)) {
-      const k = pathKey(p);
-      if (!spec.keyed.has(k)) parts.push(flat.has(k) ? cell(flat.get(k), 'pos', spec.smode.get(k)) : '-');
-    }
-    for (const p of spec.order.slice(0, -1)) {
-      const k = pathKey(p);
-      if (spec.keyed.has(k) && flat.has(k)) parts.push(`${fmtPath(p)}=${cell(flat.get(k), 'pos', spec.smode.get(k))}`);
-    }
-    const kids = spec.child !== null ? x.get(spec.child) : undefined;
-    if (spec.child !== null && x.has(spec.child) && !pyTruthy(kids)) parts.push(`${fmtSeg(spec.child)}=[]`);
-    parts.push(cell(flat.get(pathKey(last)), 'last', spec.smode.get(pathKey(last))));
-    lines.push(' '.repeat(depth) + parts.join(' '));
-    if (pyTruthy(kids)) renderRows(kids, spec.sub || spec, depth + 1, lines);
-  }
-}
+/** A line of a `|N` block (never scanned for syntax). */
+class Raw { constructor(text) { this.text = text; } toString() { return this.text; } }
+const lineText = (l) => (l instanceof Raw ? l.text : l);
+const joinLines = (ls) => ls.map(lineText).join('\n');
 
-function cell(v, ctx, strmode) {
-  if (Array.isArray(v)) return '[' + v.map((y) => fmtScalar(y, 'list', strmode)).join(',') + ']';
-  if (v instanceof Map && !v.size) return '{}';
-  return fmtScalar(v, ctx, strmode);
+const NL_MERGE = /[!-/:-@[-`{-~]\n|\n\n/g;
+
+/** Estimated tokens saved by writing s (blockOk) as a `|N` block instead of a JSON string. */
+export function blockGain(s) {
+  const merges = (s.match(NL_MERGE) || []).length;
+  return estTokens(' ' + jstr(s)) + merges - estTokens(` |${s.split('\n').length}`) - estTokens(s + '\n');
 }
 
 class Enc {
-  constructor(keepOrder) { this.keepOrder = keepOrder; }
+  constructor(keepOrder) { this.keepOrder = keepOrder; this.pending = []; }
+
+  // A string cheaper as a `|N` block is written as `|N`; its lines wait in
+  // `pending` until `line()` has written the line they belong to.
+  scalar(v, ctx = 'value', strmode = false) {
+    if (typeof v === 'string' && blockOk(v) && blockGain(v) >= 0) {
+      const parts = v.split('\n');
+      this.pending.push(...parts.map((x) => new Raw(x)));
+      return `|${parts.length}`;
+    }
+    return fmtScalar(v, ctx, strmode);
+  }
+
+  inline(v, ctx = 'value', strmode = false) {
+    return isScalar(v) ? this.scalar(v, ctx, strmode) : fmtInline(v, ctx, strmode);
+  }
+
+  line(out, text) {
+    out.push(text, ...this.pending);
+    this.pending = [];
+  }
 
   root(v) {
-    if (typeof v === 'string') return [jstr(v)];
+    if (typeof v === 'string') {
+      const lines = [];
+      const text = this.scalar(v);  // a block, or else always a JSON string (SPEC §4.5)
+      this.line(lines, this.pending.length ? text : jstr(v));
+      return lines;
+    }
     if (v instanceof Map && v.size) {
       const lines = [];
       for (const [k, x] of v) this.entry(fmtKey(k), x, 0, lines);
@@ -420,8 +446,8 @@ class Enc {
 
   entry(key, v, d, out) {
     const pad = ' '.repeat(d);
-    const inl = fmtInline(v);
-    if (inl !== null) out.push(`${pad}${key} ${inl}`);
+    const inl = this.inline(v);
+    if (inl !== null) this.line(out, `${pad}${key} ${inl}`);
     else if (v instanceof Map) {
       out.push(pad + key);
       for (const [k, x] of v) this.entry(fmtKey(k), x, d + 1, out);
@@ -430,15 +456,15 @@ class Enc {
 
   array(key, arr, d) {
     const cands = [];
-    for (const c of [this.table(key, arr, d), this.outline(key, arr, d, true),
-      this.keepOrder ? null : this.outline(key, arr, d, false)]) {
-      if (c && !cands.some((x) => x.join('\n') === c.join('\n'))) cands.push(c);
+    for (const c of [this.table(key, arr, d), ...this.outlines(key, arr, d, true),
+      ...(this.keepOrder ? [] : this.outlines(key, arr, d, false))]) {
+      if (c && !cands.some((x) => joinLines(x) === joinLines(c))) cands.push(c);
     }
     if (!cands.length || arr.length <= 2) cands.push(this.items(key, arr, d));
     if (cands.length === 1) return cands[0];
-    let best = cands[0], bestCost = estTokens(best.join('\n'));
+    let best = cands[0], bestCost = estTokens(joinLines(best));
     for (const c of cands.slice(1)) {
-      const cost = estTokens(c.join('\n'));
+      const cost = estTokens(joinLines(c));
       if (cost < bestCost) { best = c; bestCost = cost; }
     }
     return best;
@@ -456,24 +482,51 @@ class Enc {
     const head = cols.map((c, i) => fmtSeg(c) + (smode[i] ? ':str' : '')).join(',');
     const pad = ' '.repeat(d);
     const lines = [`${pad}${key}[${arr.length}]{${head}}`];
-    for (const x of arr) lines.push(pad + cols.map((c, i) => fmtScalar(x.get(c), 'cell', smode[i])).join(','));
+    for (const x of arr) this.line(lines, pad + cols.map((c, i) => this.scalar(x.get(c), 'cell', smode[i])).join(','));
     return lines;
   }
 
-  outline(key, arr, d, keepOrder = false) {
-    const spec = plan(arr, keepOrder);
-    if (spec === null) return null;
-    const lines = [`${' '.repeat(d)}${key}[${arr.length}]${spec.header()}`];
-    renderRows(arr, spec, d, lines);
-    return lines;
+  outlines(key, arr, d, keepOrder = false) {
+    return plans(arr, keepOrder).map((spec) => {
+      const lines = [`${' '.repeat(d)}${key}[${arr.length}]${spec.header(key)}`];
+      this.render(arr, spec, d, lines);
+      return lines;
+    });
+  }
+
+  cell(v, ctx, strmode) {
+    if (Array.isArray(v)) return '[' + v.map((y) => fmtScalar(y, 'list', strmode)).join(',') + ']';
+    if (v instanceof Map && !v.size) return '{}';
+    return this.scalar(v, ctx, strmode);
+  }
+
+  render(arr, spec, depth, lines) {
+    const last = spec.order[spec.order.length - 1];
+    for (const x of arr) {
+      const flat = new Map(flatNode(x, spec.child).map(([p, v]) => [pathKey(p), v]));
+      const parts = [];
+      for (const p of spec.order.slice(0, -1)) {
+        const k = pathKey(p);
+        if (!spec.keyed.has(k)) parts.push(flat.has(k) ? this.cell(flat.get(k), 'pos', spec.smode.get(k)) : '-');
+      }
+      for (const p of spec.order.slice(0, -1)) {
+        const k = pathKey(p);
+        if (spec.keyed.has(k) && flat.has(k)) parts.push(`${fmtPath(p)}=${this.cell(flat.get(k), 'pos', spec.smode.get(k))}`);
+      }
+      const kids = spec.child !== null ? x.get(spec.child) : undefined;
+      if (spec.child !== null && x.has(spec.child) && !pyTruthy(kids)) parts.push(`${fmtSeg(spec.child)}=[]`);
+      parts.push(this.cell(flat.get(pathKey(last)), 'last', spec.smode.get(pathKey(last))));
+      this.line(lines, ' '.repeat(depth) + parts.join(' '));
+      if (pyTruthy(kids)) this.render(kids, spec.sub || spec, depth + 1, lines);
+    }
   }
 
   items(key, arr, d) {
     const pad = ' '.repeat(d);
     const lines = [`${pad}${key}[${arr.length}]`];
     for (const x of arr) {
-      const inl = fmtInline(x, 'item');
-      if (inl !== null) { lines.push(`${pad}- ${inl}`); continue; }
+      const inl = this.inline(x, 'item');
+      if (inl !== null) { this.line(lines, `${pad}- ${inl}`); continue; }
       let sub;
       if (x instanceof Map) {
         sub = [];
@@ -506,16 +559,91 @@ export function toModel(v) {
 /**
  * Encode a JSON-compatible value as .bpp text.
  * options: primer (false | true | 'long'), refs (default true), keepOrder.
+ * The one-line primer only explains the syntax the output uses.
  */
 export function encode(data, { primer = false, refs = true, keepOrder = false } = {}) {
-  let model = toModel(data);
-  const out = [HEADER];
-  if (primer) out.push(primer === 'long' ? PRIMER_LONG : PRIMER);
+  return assemble(body(toModel(data), refs, keepOrder), primer, false);
+}
+
+/**
+ * Encode a Markdown document: its tree (mdToTree), or the source text behind a
+ * `bpp4 md` header when that is estimated to be shorter (SPEC §7.2).
+ */
+export function encodeMD(text, { primer = false, refs = true, keepOrder = false } = {}) {
+  const compact = assemble(body(mdToTree(text), refs, keepOrder), primer, true);
+  const raw = `${MD_HEADER}\n${text}`;
+  return estTokens(raw) < estTokens(compact) ? raw : compact;
+}
+
+function body(model, refs, keepOrder) {
   let defs = [];
   if (refs) [model, defs] = extractRefs(model);
-  defs.forEach((s, i) => out.push(`&${i} ${fmtScalar(s)}`));
-  out.push(...new Enc(keepOrder).root(model));
-  return out.join('\n') + '\n';
+  const enc = new Enc(keepOrder);
+  const lines = [];
+  defs.forEach((s, i) => enc.line(lines, `&${i} ${enc.scalar(s)}`));
+  lines.push(...enc.root(model));
+  return [lines, defs.length > 0];
+}
+
+function assemble([lines, hasRefs], primer, markdown) {
+  const out = [HEADER];
+  if (primer === 'long') out.push(PRIMER_LONG);
+  else if (primer) out.push(makePrimer(lines, hasRefs, markdown));
+  return [...out, ...lines.map(lineText)].join('\n') + '\n';
+}
+
+const TABLE_HEAD = /\[[0-9]+\](\{[^]*)$/;
+const FEATURES = [['keyed', /\?=/], ['opt', /\?(?!=)/], ['dotted', new RegExp(`[^${PYWS}{]\\.[^${PYWS}}]`, 'u')],
+  ['child', new RegExp(`\\}>[^{${PYWS}]`, 'u')], ['same', /\}>(?:\{|$)/], ['own', new RegExp(`\\}>[^{${PYWS}]*\\{`, 'u')],
+  ['status', /[{ ]status\?/], ['note?', /[{ ]note\?(?!=)/], ['note?=', /[{ ]note\?=/]];
+
+function features(lines, hasRefs) {
+  const f = new Set(hasRefs ? ['ref'] : []);
+  for (const ln of lines) {
+    if (ln instanceof Raw) { f.add('block'); continue; }
+    if (ln.includes('"')) f.add('quote');
+    const m = TABLE_HEAD.exec(ln);
+    if (!m) continue;
+    const spec = m[1];
+    if (!spec.includes(' ') && spec.includes(',') && !spec.includes('>')) { f.add('comma'); continue; }
+    f.add('table');
+    for (const [k, re] of FEATURES) if (re.test(spec)) f.add(k);
+  }
+  return f;
+}
+
+function makePrimer(lines, hasRefs, markdown) {
+  const f = features(lines, hasRefs);
+  let head;
+  const rows = [];
+  if (markdown) {
+    head = '# bpp4 Markdown:';
+    rows.push('steps[N]{cols} = N headings/list items, cols in order, title = rest of line, ' +
+      'indented rows = sub-items' + (f.has('own') ? ' (>{...}: own cols)' : ''));
+    if (f.has('status')) rows.push('status: todo/done/doing/cancelled (- none)');
+    const note = [['note?', 'note?'], ['note?=', 'note=']].filter(([k]) => f.has(k)).map(([, x]) => x);
+    if (note.length) rows.push(note.join('/') + ' its text' + (f.has('note?') ? ' (- none)' : ''));
+  } else {
+    head = "# bpp4: JSON as 'key value' lines, 1-space indent nests.";
+    if (f.has('table')) {
+      rows.push(f.has('dotted')
+        ? 'k[N]{a b.c}: N rows, values in column order (b.c = key c of b), last one = rest of line'
+        : 'k[N]{a b}: N rows, values in column order, last one = rest of line');
+    }
+    if (f.has('comma')) rows.push('k[N]{a,b}: N comma rows');
+    if (f.has('opt')) rows.push('x? optional (- = absent)');
+    if (f.has('keyed')) rows.push('x?= as x=v');
+    if (f.has('child') || f.has('same')) {
+      rows.push(f.has('child') && f.has('same') ? '>k: indented rows are k (bare >: same key)'
+        : f.has('child') ? '>k: indented rows are k' : '>: indented rows are children (same key)');
+    }
+  }
+  const vals = [['quote', '"..." = JSON string'], ['block', '|N = the next N lines'], ['ref', '*n = &n']]
+    .filter(([k]) => f.has(k)).map(([, x]) => x);
+  let out = head;
+  if (rows.length) out += ' ' + rows.join('; ') + '.';
+  if (vals.length) out += ' ' + vals.join(', ') + '.';
+  return out;
 }
 
 // ----------------------------------------------------------------- decoder
@@ -529,7 +657,10 @@ function parseBare(tok, strmode) {
 }
 
 class Cursor {
-  constructor(text, refs, line) { this.s = text; this.i = 0; this.refs = refs; this.line = line; }
+  // `blocks(n)` reads a `|N` block (bpp4), or is null.
+  constructor(text, refs, line, blocks = null) {
+    this.s = text; this.i = 0; this.refs = refs; this.line = line; this.blocks = blocks;
+  }
   err(msg) { throw new BppError(msg, this.line); }
   eof() { return this.i >= this.s.length; }
   peek() { return this.i < this.s.length ? this.s[this.i] : ''; }
@@ -568,29 +699,30 @@ class Cursor {
     this.i += m[0].length;
     return m[0];
   }
-  resolve(tok, strmode) {
-    if (/^\*[0-9]+$/.test(tok)) {
+  resolve(tok, strmode, block = true) {
+    if (block && this.blocks && BLOCK_FULL.test(tok)) return this.blocks(parseInt(tok.slice(1), 10));
+    if (REF_FULL.test(tok)) {
       const idx = parseInt(tok.slice(1), 10);
       if (idx >= this.refs.length) this.err(`undefined reference ${tok}`);
       return this.refs[idx];
     }
     return parseBare(tok, strmode);
   }
-  token(stops, strmode = false) {
+  token(stops, strmode = false, block = true) {
     if (this.peek() === '"') return this.jstring();
     let j = this.i;
     while (j < this.s.length && !stops.includes(this.s[j])) j++;
     const tok = this.s.slice(this.i, j);
     if (!tok) this.err(`empty value at column ${this.i + 1}`);
     this.i = j;
-    return this.resolve(tok, strmode);
+    return this.resolve(tok, strmode, block);
   }
   inlineList(strmode = false) {
     this.expect('[');
     const out = [];
     if (this.peek() === ']') { this.i++; return out; }
     for (;;) {
-      out.push(this.token(',]', strmode));
+      out.push(this.token(',]', strmode, false));
       const c = this.peek();
       this.i++;
       if (c === ']') return out;
@@ -641,30 +773,62 @@ class DSpec {
 const NO = Symbol('no');
 
 class Dec {
-  constructor(lines, version) { this.L = lines; this.version = version; this.i = 0; this.refs = []; }
-  cur(ln, start = 0) { const c = new Cursor(ln.text, this.refs, ln.no); c.i = start; return c; }
-  depthAt(i) { return i < this.L.length ? this.L[i].depth : -1; }
+  constructor(raw, start, version) {
+    this.raw = raw; this.version = version; this.refs = [];
+    this.i = start;     // index into raw of the next unread line
+    this.bpos = start;  // where the next `|N` block of the current line begins
+  }
+
+  // Blank and comment lines are skipped when looking for the next logical
+  // line, but `|N` blocks are read straight from `raw`.
+  lineAt(j) {
+    for (; j < this.raw.length; j++) {
+      let ln = this.raw[j];
+      if (ln.endsWith('\r')) ln = ln.slice(0, -1);
+      const stripped = ln.replace(/^ +/, '');
+      if (stripped && !stripped.startsWith('#')) return { depth: ln.length - stripped.length, text: stripped, no: j + 1, idx: j };
+    }
+    return null;
+  }
+  peek() { return this.lineAt(this.i); }
+  take() { const ln = this.lineAt(this.i); this.i = this.bpos = ln.idx + 1; return ln; }
+  block(n) {
+    if (n < 1 || this.bpos + n > this.raw.length) throw new BppError(`block |${n} runs past the end of the file`, this.bpos);
+    const out = this.raw.slice(this.bpos, this.bpos + n).map((l) => (l.endsWith('\r') ? l.slice(0, -1) : l));
+    this.bpos += n;
+    this.i = this.bpos;
+    return out.join('\n');
+  }
+  cur(ln, start = 0) {
+    const c = new Cursor(ln.text, this.refs, ln.no, this.version >= 4 ? (n) => this.block(n) : null);
+    c.i = start;
+    return c;
+  }
+  depthAt() { const ln = this.peek(); return ln ? ln.depth : -1; }
 
   document() {
-    while (this.i < this.L.length && this.L[this.i].text.startsWith('&')) {
-      const ln = this.L[this.i];
+    while (this.peek() !== null && this.peek().text.startsWith('&')) {
+      const ln = this.take();
       const m = /^&([0-9]+) /.exec(ln.text);
       if (!m || ln.depth || parseInt(m[1], 10) !== this.refs.length) throw new BppError('bad dictionary definition', ln.no);
       const c = this.cur(ln, m[0].length);
       const v = c.value();
       if (typeof v !== 'string' || !c.eof()) throw new BppError('dictionary value must be a string', ln.no);
       this.refs.push(v);
-      this.i++;
     }
-    if (this.i >= this.L.length) throw new BppError('empty document');
-    const first = this.L[this.i];
+    const first = this.peek();
+    if (first === null) throw new BppError('empty document');
     if (first.depth) throw new BppError('unexpected indentation', first.no);
-    if (this.i === this.L.length - 1) {
-      const v = this.rootInline(first);
-      if (v !== NO) { this.i++; return v; }
+    let v = NO;
+    if (this.version >= 4 && BLOCK_FULL.test(first.text)) {
+      this.take();
+      v = this.block(parseInt(first.text.slice(1), 10));  // a root string written as a block
+    } else if (this.lineAt(first.idx + 1) === null && (v = this.rootInline(first)) !== NO) {
+      this.take();
+    } else {
+      v = first.text.startsWith('[') ? this.keyless(first, 0) : this.object(0);
     }
-    const v = first.text.startsWith('[') ? this.keyless(first, 0) : this.object(0);
-    if (this.i < this.L.length) throw new BppError('unexpected content', this.L[this.i].no);
+    if (this.peek() !== null) throw new BppError('unexpected content', this.peek().no);
     return v;
   }
 
@@ -688,12 +852,12 @@ class Dec {
 
   object(d) {
     const obj = new Map();
-    while (this.i < this.L.length) {
-      const ln = this.L[this.i];
+    let ln;
+    while ((ln = this.peek()) !== null) {
       if (ln.depth < d) break;
       if (ln.depth > d) throw new BppError('unexpected indentation', ln.no);
       if (ln.text.startsWith('- ') || ln.text === '-') throw new BppError('list item outside a list', ln.no);
-      this.i++;
+      this.take();
       const [k, v] = this.entry(ln, 0, d);
       obj.set(k, v);
     }
@@ -705,7 +869,7 @@ class Dec {
     const key = c.key();
     const rest = ln.text.slice(c.i);
     if (rest === '') {
-      if (this.depthAt(this.i) !== d + 1) throw new BppError(`key '${key}' has no value`, ln.no);
+      if (this.depthAt() !== d + 1) throw new BppError(`key '${key}' has no value`, ln.no);
       return [key, this.object(d + 1)];
     }
     if (rest[0] === ' ') {
@@ -714,32 +878,32 @@ class Dec {
       if (!c.eof()) throw new BppError('trailing characters', ln.no);
       return [key, v];
     }
-    if (rest[0] === '[') return [key, this.block(rest, ln, d)];
+    if (rest[0] === '[') return [key, this.array(rest, ln, d, key)];
     throw new BppError(`expected space after key '${key}'`, ln.no);
   }
 
   keyless(ln, d) {
     const h = header(ln.text);
-    if (h && (h[1] || this.itemsFollow(d))) { this.i++; return this.block(ln.text, ln, d); }
+    if (h && (h[1] || this.itemsFollow(ln, d))) { this.take(); return this.array(ln.text, ln, d); }
+    this.take();
     const c = this.cur(ln);
     const v = c.inlineList();
     if (!c.eof()) throw new BppError('trailing characters', ln.no);
-    this.i++;
     return v;
   }
 
-  itemsFollow(d) {
-    const j = this.i + 1;
-    return j < this.L.length && this.L[j].depth === d && (this.L[j].text.startsWith('- ') || this.L[j].text === '-');
+  itemsFollow(ln, d) {
+    const nxt = this.lineAt(ln.idx + 1);
+    return nxt !== null && nxt.depth === d && (nxt.text.startsWith('- ') || nxt.text === '-');
   }
 
-  block(head, ln, d) {
+  array(head, ln, d, key = null) {
     const h = header(head);
     if (!h) throw new BppError('bad array header', ln.no);
     const [n, rest] = h;
     if (!rest) return this.items(n, d, ln);
     const c = this.cur({ text: rest, no: ln.no });
-    const spec = this.spec(c);
+    const spec = this.spec(c, key);
     if (!c.eof()) throw new BppError('bad array header', ln.no);
     if (spec.child === null && !spec.optional.size && (spec.cols.length === 1 || spec.delim === ',')) {
       return this.table(n, spec, d, ln);
@@ -747,7 +911,8 @@ class Dec {
     return this.outline(n, spec, d, ln);
   }
 
-  spec(c) {
+  /** Column spec; `key` is the key its rows are stored under (null: keyless). */
+  spec(c, key) {
     const dotted = this.version >= 3;
     c.expect('{');
     const cols = [];
@@ -773,8 +938,11 @@ class Dec {
     let child = null, sub = null;
     if (c.peek() === '>') {
       c.i++;
-      child = dotted ? c.segment() : c.key();
-      if (dotted && c.peek() === '{') sub = this.spec(c);
+      if (this.version >= 4 && (c.peek() === '{' || c.peek() === '')) {
+        if (key === null) c.err("'>' without a name needs a keyed table");  // bpp4: bare > = same key
+        child = key;
+      } else child = dotted ? c.segment() : c.key();
+      if (dotted && c.peek() === '{') sub = this.spec(c, child);
     }
     return new DSpec(cols, delim || ',', child, sub);
   }
@@ -782,8 +950,8 @@ class Dec {
   table(n, spec, d, ln) {
     const rows = [];
     for (let r = 0; r < n; r++) {
-      if (this.i >= this.L.length || this.L[this.i].depth !== d) throw new BppError(`expected ${n} table rows`, ln.no);
-      const row = this.L[this.i++];
+      if (this.depthAt() !== d) throw new BppError(`expected ${n} table rows`, ln.no);
+      const row = this.take();
       const c = this.cur(row);
       const obj = new Map();
       spec.order.forEach((p, j) => {
@@ -795,7 +963,6 @@ class Dec {
     }
     return rows;
   }
-
   outline(n, spec, d, ln) {
     const dotted = this.version >= 3;
     const check = (sp) => {
@@ -859,13 +1026,13 @@ class Dec {
 
     const rowsAt = (depth, count, sp) => {
       const out = [];
-      while (this.i < this.L.length && (count === null || out.length < count)) {
-        const r = this.L[this.i];
+      let r;
+      while ((r = this.peek()) !== null && (count === null || out.length < count)) {
         if (r.depth < depth) break;
         if (r.depth > depth) throw new BppError('unexpected indentation', r.no);
-        this.i++;
+        this.take();
         const obj = row(r, sp);
-        if (sp.child !== null && this.depthAt(this.i) === depth + 1) {
+        if (sp.child !== null && this.depthAt() === depth + 1) {
           if (obj.has(sp.child)) throw new BppError('child rows after child=[]', r.no);
           obj.set(sp.child, rowsAt(depth + 1, null, sp.sub || sp));
         }
@@ -880,10 +1047,9 @@ class Dec {
   items(n, d, ln) {
     const out = [];
     for (let k = 0; k < n; k++) {
-      if (this.i >= this.L.length || this.L[this.i].depth !== d) throw new BppError(`expected ${n} list items`, ln.no);
-      const it = this.L[this.i];
+      if (this.depthAt() !== d) throw new BppError(`expected ${n} list items`, ln.no);
+      const it = this.take();
       if (!it.text.startsWith('- ')) throw new BppError("expected '- ' list item", it.no);
-      this.i++;
       out.push(this.item(it, d));
     }
     return out;
@@ -891,11 +1057,14 @@ class Dec {
 
   item(it, d) {
     const body = it.text.slice(2);
-    const sub = { depth: d + 1, text: body, no: it.no };
+    const sub = { depth: d + 1, text: body, no: it.no, idx: it.idx };
+    if (this.version >= 4 && BLOCK_FULL.test(body)) return this.block(parseInt(body.slice(1), 10));
     if (body.startsWith('[')) {
       const h = header(body);
-      if (h && (h[1] || (this.i < this.L.length && this.L[this.i].depth === d + 1 &&
-          this.L[this.i].text.startsWith('- ')))) return this.block(body, sub, d + 1);
+      const nxt = this.peek();
+      if (h && (h[1] || (nxt !== null && nxt.depth === d + 1 && nxt.text.startsWith('- ')))) {
+        return this.array(body, sub, d + 1);
+      }
       const c = this.cur(sub);
       const v = c.inlineList();
       if (!c.eof()) throw new BppError('trailing characters', it.no);
@@ -912,7 +1081,7 @@ class Dec {
     }
     if (key !== null) {
       const isEntry = rest.startsWith(' ') || rest.startsWith('[') ||
-        (rest === '' && this.depthAt(this.i) === d + 2);
+        (rest === '' && this.depthAt() === d + 2);
       if (isEntry) {
         const [k, v] = this.entry(sub, 0, d + 1);
         const obj = new Map([[k, v]]);
@@ -930,23 +1099,34 @@ class Dec {
   }
 }
 
+const HEADERS = ['bpp1', 'bpp2', 'bpp3', 'bpp4'];
+
+/** [version, raw lines, index of the first body line]; version 0 = Markdown source. */
+function head(text) {
+  const raw = text.split('\n');
+  for (let idx = 0; idx < raw.length; idx++) {
+    const ln = raw[idx].endsWith('\r') ? raw[idx].slice(0, -1) : raw[idx];
+    const stripped = ln.replace(/^ +/, '');
+    if (!stripped || stripped.startsWith('#')) continue;
+    if (stripped === MD_HEADER) return [0, raw, idx + 1];
+    if (!HEADERS.includes(stripped)) throw new BppError("missing 'bpp4' header", idx + 1);
+    return [Number(stripped[3]), raw, idx + 1];
+  }
+  throw new BppError("missing 'bpp4' header");
+}
+
+/** The Markdown text of a `bpp4 md` file (SPEC §7.2), or null for any other file. */
+export function mdSource(text) {
+  const [version, raw, start] = head(text);
+  if (version) return null;
+  return start < raw.length ? raw.slice(start).join('\n') : '';
+}
+
 /** Decode .bpp text. Objects come back as Maps and numbers as Num. */
 export function decode(text) {
-  const lines = [];
-  let version = 0;
-  text.split('\n').forEach((raw, idx) => {
-    let ln = raw.endsWith('\r') ? raw.slice(0, -1) : raw;
-    const stripped = ln.replace(/^ +/, '');
-    if (!stripped || stripped.startsWith('#')) return;
-    if (!version) {
-      if (!['bpp1', 'bpp2', 'bpp3'].includes(stripped)) throw new BppError("missing 'bpp3' header", idx + 1);
-      version = Number(stripped[3]);
-      return;
-    }
-    lines.push({ depth: ln.length - stripped.length, text: stripped, no: idx + 1 });
-  });
-  if (!version) throw new BppError("missing 'bpp3' header");
-  return new Dec(lines, version).document();
+  const [version, raw, start] = head(text);
+  if (!version) return mdToTree(mdSource(text));
+  return new Dec(raw, start, version).document();
 }
 
 // ---------------------------------------------------------------- JSON I/O
@@ -1129,6 +1309,55 @@ const HEADING = new RegExp(`^(#{1,6})[${PYWS}]+([^\\n]*?)[${PYWS}]*#*[${PYWS}]*$
 const ITEM = /^( *)([-*+]|\p{Nd}{1,9}[.)])(?: +([^\n]*))?$/u;
 const BOX = /^\[([ xX/-])\] +/;
 const FENCE = /^(```|~~~)/;
+// Lines that start (or may start) a block of their own; they are never joined.
+const BLOCKISH = /^(?:```|~~~|>|<|\$\$|\[[^\]]*\]:|[-*+](?: |$)|\p{Nd}{1,9}[.)](?: |$)|#)/u;
+const RULE = /^[-=*_ ]+$/;  // thematic break or setext underline
+// HTML blocks that run to an end marker (CommonMark types 1-5); other HTML runs to a blank line.
+const HTML_RAW = [[/^<(?:pre|script|style|textarea)(?:[ >]|$)/iu, /<\/(?:pre|script|style|textarea)>/iu],
+  [/^<!--/, /-->/], [/^<\?/, /\?>/], [/^<!\[CDATA\[/, /\]\]>/], [/^<![A-Za-z]/, />/]];
+const RSTRIP_RE = new RegExp(`[${PYWS}]+$`, 'u');
+const pyRstrip = (s) => s.replace(RSTRIP_RE, '');
+const hardBreak = (line) => line.endsWith('  ') || line.endsWith('\\');
+
+/** A line that can only be paragraph text (so joining it keeps the structure). */
+function plainLine(line) {
+  const s = pyStrip(line);
+  return !!s && !s.includes('|') && !BLOCKISH.test(s) && !RULE.test(s);
+}
+
+/** Join the soft-wrapped lines of plain paragraphs in a note with a space (see markdown._join_soft). */
+function joinSoft(lines) {
+  const out = [];
+  let fence = null, html = null, joinable = false;
+  lines.forEach((ln, i) => {
+    const s = ln.replace(/^ +/, '');
+    out.push(ln);
+    if (fence) {
+      if (s.startsWith(fence) || (fence === '---' && pyRstrip(s) === '...')) fence = null;
+    } else if (html) {
+      if ((html === 'blank' && !s) || (html !== 'blank' && html.test(ln))) html = null;
+    } else if (i === 0 && pyRstrip(s) === '---') {
+      fence = '---';
+    } else if (/^(?:```|~~~|\$\$)/.test(s)) {
+      fence = s[0] !== '$' ? s.slice(0, 3) : '$$';
+      if (fence === '$$' && pyRstrip(s).length > 2 && pyRstrip(s).endsWith('$$')) fence = null;
+    } else if (s.startsWith('<')) {
+      html = 'blank';
+      for (const [start, end] of HTML_RAW) {
+        const m = start.exec(s);
+        if (m) {
+          html = end.test(s.slice(m[0].length)) ? null : end;
+          break;
+        }
+      }
+    } else if (joinable && ln === s && plainLine(ln)) {
+      out.pop();
+      out[out.length - 1] = pyRstrip(out[out.length - 1]) + ' ' + ln;
+    }
+    joinable = !fence && !html && ln === s && plainLine(ln) && !hardBreak(ln);
+  });
+  return out;
+}
 const STATUS = { ' ': 'todo', x: 'done', X: 'done', '/': 'doing', '-': 'cancelled' };
 
 function expandTabs(s, size = 4) {
@@ -1155,6 +1384,7 @@ export function mdToTree(text) {
   const headings = [[0, root]];
   let items = [];
   let fence = null;
+  let para = null;  // list item whose first paragraph (its title) is still open
   const h1Nodes = [];
   for (const raw of text.replace(/\r\n/g, '\n').split('\n')) {
     const line = expandTabs(raw);
@@ -1167,6 +1397,7 @@ export function mdToTree(text) {
       continue;
     }
     if (!stripped) {
+      para = null;
       const target = items.length ? items[items.length - 1][2] : headings[headings.length - 1][1];
       const nl = notes.get(target);
       if (nl && nl.length && nl[nl.length - 1] !== '') addNote(target, '');
@@ -1181,6 +1412,7 @@ export function mdToTree(text) {
       addStep(headings[headings.length - 1][1], node);
       headings.push([level, node]);
       items = [];
+      para = null;
       continue;
     }
     m = ITEM.exec(line);
@@ -1190,8 +1422,17 @@ export function mdToTree(text) {
       const parent = items.length ? items[items.length - 1][2] : headings[headings.length - 1][1];
       addStep(parent, node);
       items.push([indent, indent + m[2].length + 1, node]);
+      para = node.get('title') && !hardBreak(line) ? node : null;
       continue;
     }
+    if (para !== null && pyStrip(stripped) && !BLOCKISH.test(stripped) && !stripped.includes('|') &&
+        !RULE.test(pyRstrip(stripped))) {
+      // a wrapped (possibly lazy) line of the item's first paragraph
+      para.set('title', para.get('title') + ' ' + pyStrip(stripped));
+      if (hardBreak(line)) para = null;
+      continue;
+    }
+    para = null;
     while (items.length && indent < items[items.length - 1][1] && indent <= items[items.length - 1][0]) items.pop();
     const [node, col] = items.length ? [items[items.length - 1][2], items[items.length - 1][1]]
       : [headings[headings.length - 1][1], 0];
@@ -1203,7 +1444,7 @@ export function mdToTree(text) {
     const note = notes.get(node);
     if (note) {
       while (note.length && note[note.length - 1] === '') note.pop();
-      if (note.length) node.set('note', note.join('\n'));
+      if (note.length) node.set('note', joinSoft(note).join('\n'));
     }
     for (const c of node.get('steps') || []) finish(c);
   };

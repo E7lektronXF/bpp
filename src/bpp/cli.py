@@ -27,27 +27,43 @@ def _write(path: str | None, text: str):
             f.write(text)
 
 
-def _load(path: str, fmt: str | None):
-    fmt = fmt or (detect(path) if path != "-" else None)
-    if not fmt:
-        raise ValueError("reading stdin needs --from")
-    return loads(_read(path), fmt), fmt
+def _encode(text: str, fmt: str, **opts) -> str:
+    """Source text -> .bpp; Markdown keeps its source as a fallback (SPEC §7.2)."""
+    if fmt == "md":
+        from .encoder import encode_md
+        return encode_md(text, **opts)
+    # CSV column order is part of the data, so never move a column there.
+    if fmt == "csv":
+        opts["keep_order"] = True
+    return dumps(loads(text, fmt), "bpp", **opts)
+
+
+def _decode(text: str, to: str, **kw) -> str:
+    """.bpp text -> `to`; a `bpp4 md` file gives back its Markdown unchanged."""
+    if to == "md":
+        from .decoder import md_source
+        src = md_source(text)
+        if src is not None:
+            return src
+    return dumps(loads(text, "bpp"), to, **kw)
 
 
 def cmd_encode(a) -> int:
-    data, fmt = _load(a.input, a.from_)
+    fmt = a.from_ or (detect(a.input) if a.input != "-" else None)
+    if not fmt:
+        raise ValueError("reading stdin needs --from")
     primer = {"none": False, "short": True, "long": "long"}[a.primer]
-    # CSV column order is part of the data, so never move a column there.
-    _write(a.output, dumps(data, "bpp", primer=primer, refs=not a.no_refs,
-                           keep_order=a.keep_order or fmt == "csv"))
+    if fmt == "md" and primer == "long":
+        primer = True  # Markdown has its own one-line primer
+    _write(a.output, _encode(_read(a.input), fmt, primer=primer, refs=not a.no_refs,
+                             keep_order=a.keep_order))
     return 0
 
 
 def cmd_decode(a) -> int:
-    data, _ = _load(a.input, a.from_ or "bpp")
     to = a.to or (detect(a.output) if a.output and a.output != "-" else "json")
     kw = {"indent": None if a.indent < 0 else a.indent} if to == "json" else {}
-    _write(a.output, dumps(data, to, **kw))
+    _write(a.output, _decode(_read(a.input), to, **kw))
     return 0
 
 
@@ -67,8 +83,14 @@ def _toon_bridge() -> list[str] | None:
     return None
 
 
-def renderings(data, keep_order: bool = False, markdown: bool = False) -> dict[str, str]:
-    """The same data in every format we compare."""
+def renderings(data, keep_order: bool = False, markdown: bool = False,
+               source: str | None = None) -> dict[str, str]:
+    """The same data in every format we compare.
+
+    source: the Markdown text `data` was read from; it is shown as "Markdown"
+    (instead of the normalized Markdown written from `data`) and the bpp rows
+    use `encode_md`, which may keep the source (SPEC §7.2).
+    """
     import json
 
     out = {
@@ -80,27 +102,36 @@ def renderings(data, keep_order: bool = False, markdown: bool = False) -> dict[s
         out["CSV"] = dumps(data, "csv")
     except ValueError:
         pass
-    if markdown:
-        out["Markdown"] = dumps(data, "md")
+    if markdown or source is not None:
+        out["Markdown"] = source if source is not None else dumps(data, "md")
     bridge = _toon_bridge()
     if bridge:
         p = subprocess.run(bridge, input=json.dumps(data, ensure_ascii=False),
                            capture_output=True, text=True, encoding="utf-8")
         if p.returncode == 0:
             out["TOON"] = p.stdout
-    out["bpp"] = dumps(data, "bpp", keep_order=keep_order)
-    out["bpp + primer"] = dumps(data, "bpp", primer=True, keep_order=keep_order)
+    if source is not None:
+        from .encoder import encode_md
+        out["bpp"] = encode_md(source)
+        out["bpp + primer"] = encode_md(source, primer=True)
+    else:
+        out["bpp"] = dumps(data, "bpp", keep_order=keep_order)
+        out["bpp + primer"] = dumps(data, "bpp", primer=True, keep_order=keep_order)
     return out
 
 
 def cmd_stats(a) -> int:
     from .tokens import available_counters
 
-    data, fmt = _load(a.input, a.from_)
+    fmt = a.from_ or (detect(a.input) if a.input != "-" else None)
+    if not fmt:
+        raise ValueError("reading stdin needs --from")
+    raw = _read(a.input)
+    data = loads(raw, fmt)
     counters = available_counters()
     rows = [(name, text, {c: fn(text) for c, fn in counters.items()})
             for name, text in renderings(data, keep_order=fmt == "csv",
-                                             markdown=fmt == "md").items()]
+                                             source=raw if fmt == "md" else None).items()]
     base = rows[0][2]
     names = list(counters)
     head = ["format", "chars"] + names + [f"vs JSON ({n})" for n in names]
@@ -153,13 +184,13 @@ def cmd_auto(a) -> int:
                                                         "csv": "csv"}.get(to, "json")))
         if out != "-" and Path(out).exists() and not a.force:
             raise ValueError(f"{out} exists; use -o to pick another name or --force to overwrite")
-        text = dumps(loads(_read(a.input), "bpp"), to)
+        text = _decode(_read(a.input), to)
         _write(out, text)
     else:
         fmt = detect(src)
         raw = _read(a.input)
         out = a.output or str(src.with_suffix(".bpp"))
-        text = dumps(loads(raw, fmt), "bpp", primer=a.primer, keep_order=fmt == "csv")
+        text = _encode(raw, fmt, primer=a.primer)
         _write(out, text)
         if out != "-":
             print(f"{src} -> {out}{_savings(raw, text)}", file=sys.stderr)

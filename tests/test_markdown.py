@@ -11,8 +11,10 @@ Giriş metni.
 Bu plan Q3 hedeflerini kapsar.
 
 ## Hazırlık
-- [x] Gereksinimleri topla
+- [x] Gereksinimleri topla  
   Paydaşlarla 3 toplantı yapıldı.
+- [ ] Uzun bir madde başlığı
+  iki satıra kaydırılmış
 - [ ] Tasarım dokümanı
   - [x] Taslak
   - [/] İnceleme
@@ -45,9 +47,11 @@ def test_structure():
     assert t["note"] == "Giriş metni.\n\nBu plan Q3 hedeflerini kapsar."
     prep, dev = t["steps"]
     assert prep["title"] == "Hazırlık" and "status" not in prep
-    gather, design, free, plus = prep["steps"]
+    gather, wrapped, design, free, plus = prep["steps"]
+    # a hard break (two trailing spaces) ends the title; a soft wrap continues it
     assert gather == {"title": "Gereksinimleri topla", "status": "done",
                       "note": "Paydaşlarla 3 toplantı yapıldı."}
+    assert wrapped == {"title": "Uzun bir madde başlığı iki satıra kaydırılmış", "status": "todo"}
     assert [s["status"] for s in design["steps"]] == ["done", "doing", "cancelled"]
     assert design["steps"][1]["note"] == "```yaml\nkey: 1\n  nested: true\n```"
     assert free["title"] == "Serbest madde, virgüllü" and plus["title"] == "Artı işaretli madde"

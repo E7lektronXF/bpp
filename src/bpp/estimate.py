@@ -14,9 +14,9 @@ _PIECE = re.compile(
     r" ?[A-Za-z]+"          # ASCII word, leading space merges
     r"| ?[^\W\d_A-Za-z]+"   # non-ASCII letters (ç, ş, ı ...)
     r"| ?\d{1,3}"           # digits come in groups of up to 3
-    r"|\n"
+    r"|\n+"                 # a run of newlines (a blank line) is one token
     r"| +"
-    r"|[^\w\s]{1,2}"        # punctuation, often in pairs
+    r"|(?![?\"]=|=\|)[^\w\s]{1,2}"  # punctuation, often in pairs (but ?= "= =| stay two)
     r"|."
 )
 
