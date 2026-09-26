@@ -114,6 +114,16 @@ python bench/run_qa.py --repeats 3 --effort high   # a more robust measurement
 python bench/run_qa.py --model claude-sonnet-5 --examples plan logs
 ```
 
+Any OpenAI-compatible API works too, with no extra package. Results go to
+`bench/results/qa-<model>.md`:
+
+```bash
+export NVIDIA_API_KEY=nvapi-...                    # free key from build.nvidia.com
+python bench/run_qa.py --provider nvidia           # deepseek-ai/deepseek-v4.1-flash, temperature 0
+python bench/run_qa.py --provider nvidia --model openai/gpt-oss-20b
+python bench/run_qa.py --provider openai --base-url https://.../v1 --model NAME   # OPENAI_API_KEY
+```
+
 The default run is 39 requests and about 60k input tokens. Refusal fallback is deliberately
 **off**: a fallback would answer with a different model and spoil the comparison. Refusals count
 as wrong answers and are reported.

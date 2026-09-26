@@ -112,6 +112,16 @@ python bench/run_qa.py --repeats 3 --effort high   # daha sağlam ölçüm
 python bench/run_qa.py --model claude-sonnet-5 --examples plan logs
 ```
 
+OpenAI-compatible (OpenAI biçimini kullanan) her API de ek paket gerekmeden çalışır. Sonuçlar
+`bench/results/qa-<model>.md` dosyasına yazılır:
+
+```bash
+export NVIDIA_API_KEY=nvapi-...                    # build.nvidia.com'dan ücretsiz anahtar
+python bench/run_qa.py --provider nvidia           # deepseek-ai/deepseek-v4.1-flash, temperature 0
+python bench/run_qa.py --provider nvidia --model openai/gpt-oss-20b
+python bench/run_qa.py --provider openai --base-url https://.../v1 --model NAME   # OPENAI_API_KEY
+```
+
 Varsayılan çalıştırma 39 istek ve ~60 bin giriş token'ıdır. Refusal fallback bilerek **kapalıdır**:
 bir fallback başka bir modelle cevap verip karşılaştırmayı bozardı. Refusal'lar yanlış sayılır ve
 raporlanır.

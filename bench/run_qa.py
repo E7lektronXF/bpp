@@ -1,13 +1,18 @@
-"""Comprehension benchmark: ask Claude the same questions about the same data in
+"""Comprehension benchmark: ask a model the same questions about the same data in
 every format and compare accuracy.
 
     python bench/run_qa.py --dry-run          # show questions, answers, prompt sizes
     ANTHROPIC_API_KEY=... python bench/run_qa.py [--model claude-opus-5] [--repeats 3]
+    NVIDIA_API_KEY=nvapi-... python bench/run_qa.py --provider nvidia [--model openai/gpt-oss-20b]
+    OPENAI_API_KEY=... python bench/run_qa.py --provider openai --base-url URL --model NAME
+
+`--provider nvidia` uses NVIDIA's OpenAI-compatible API (build.nvidia.com); `openai`
+works with any OpenAI-compatible endpoint. These need no extra package.
 
 Each (example, format) pair is one request containing the data and all 10
 questions. Expected answers are computed from the data, so grading is
 automatic. Without an API key the script only prints what it would do.
-Requires `pip install anthropic` (or `pip install ".[api]"`).
+The Anthropic provider requires `pip install anthropic` (or `pip install ".[api]"`).
 
 Refusal fallbacks are deliberately NOT enabled: a fallback would answer with a
 different model and contaminate the comparison. Refusals are counted as wrong
@@ -22,6 +27,8 @@ import os
 import re
 import sys
 import time
+import urllib.error
+import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -231,15 +238,54 @@ def parse_answers(text: str, n: int) -> list[str | None]:
 
 def formats_for(name) -> dict[str, str]:
     data, fmt = load(name)
-    out = renderings(data, keep_order=fmt == "csv")
     if fmt == "md":
-        out = {"Markdown (source)": (EX / EXAMPLES[name][0]).read_text(encoding="utf-8"), **out}
-    return out
+        # The Markdown source itself, and bpp exactly as `bpp FILE.md` writes it (encode_md).
+        source = (EX / EXAMPLES[name][0]).read_text(encoding="utf-8")
+        return renderings(data, source=source)
+    return renderings(data, keep_order=fmt == "csv")
 
 
 def prompt(fmt_name: str, text: str, qs) -> str:
     qlines = "\n".join(f"{i}. {q}" for i, (q, _, _) in enumerate(qs, 1))
     return f"Data ({fmt_name}):\n```\n{text}```\n\nQuestions:\n{qlines}"
+
+
+PROVIDERS = {
+    "anthropic": {"env": "ANTHROPIC_API_KEY", "model": "claude-opus-5", "base_url": None},
+    "nvidia": {"env": "NVIDIA_API_KEY", "model": "deepseek-ai/deepseek-v4.1-flash",
+               "base_url": "https://integrate.api.nvidia.com/v1"},
+    "openai": {"env": "OPENAI_API_KEY", "model": "gpt-5-mini", "base_url": "https://api.openai.com/v1"},
+}
+
+_THINK = re.compile(r"<think>.*?(</think>|$)", re.S)
+
+
+def ask_openai(base_url, key, model, user, max_tokens=16000):
+    """One chat completion from an OpenAI-compatible endpoint (stdlib only)."""
+    body = json.dumps({"model": model, "temperature": 0, "max_tokens": max_tokens,
+                       "messages": [{"role": "system", "content": SYSTEM},
+                                    {"role": "user", "content": user}]}).encode()
+    req = urllib.request.Request(base_url.rstrip("/") + "/chat/completions", data=body, headers={
+        "Authorization": f"Bearer {key}", "Content-Type": "application/json",
+        "Accept": "application/json"})
+    for attempt in range(6):
+        try:
+            with urllib.request.urlopen(req, timeout=600) as r:
+                d = json.load(r)
+            break
+        except urllib.error.HTTPError as e:
+            detail = e.read()[:300].decode("utf-8", "replace")
+            if e.code in (429, 500, 502, 503, 504):
+                time.sleep(min(60, 2 ** attempt * 5))
+                continue
+            raise RuntimeError(f"HTTP {e.code} from {base_url}: {detail}") from None
+        except (urllib.error.URLError, TimeoutError):
+            time.sleep(min(60, 2 ** attempt * 5))
+    else:
+        raise RuntimeError("API kept failing")
+    choice = d["choices"][0]
+    text = _THINK.sub("", choice["message"].get("content") or "")
+    return text, choice.get("finish_reason"), (d.get("usage") or {}).get("prompt_tokens")
 
 
 def ask(client, model, effort, user):
@@ -262,12 +308,23 @@ def ask(client, model, effort, user):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--model", default=os.environ.get("BPP_QA_MODEL", "claude-opus-5"))
-    ap.add_argument("--effort", default="low", choices=["low", "medium", "high", "xhigh", "max"])
+    ap.add_argument("--provider", choices=list(PROVIDERS),
+                    help="default: the first provider whose API key is set (anthropic, nvidia, openai)")
+    ap.add_argument("--model", default=os.environ.get("BPP_QA_MODEL"),
+                    help="default: claude-opus-5 / deepseek-ai/deepseek-v4.1-flash / gpt-5-mini")
+    ap.add_argument("--base-url", help="OpenAI-compatible endpoint (overrides the provider's)")
+    ap.add_argument("--effort", default="low", choices=["low", "medium", "high", "xhigh", "max"],
+                    help="Anthropic only")
     ap.add_argument("--repeats", type=int, default=1)
     ap.add_argument("--examples", nargs="*", default=list(EXAMPLES))
     ap.add_argument("--dry-run", action="store_true")
     a = ap.parse_args()
+    if not a.provider:
+        a.provider = next((p for p, c in PROVIDERS.items() if os.environ.get(c["env"])), "anthropic")
+    prov = PROVIDERS[a.provider]
+    a.model = a.model or prov["model"]
+    base_url = a.base_url or prov["base_url"]
+    key = os.environ.get(prov["env"])
 
     plan = []
     for name in a.examples:
@@ -277,9 +334,9 @@ def main():
         for fmt_name, text in formats_for(name).items():
             plan.append((name, fmt_name, prompt(fmt_name, text, qs), qs))
 
-    if a.dry_run or not os.environ.get("ANTHROPIC_API_KEY"):
+    if a.dry_run or not key:
         if not a.dry_run:
-            print("ANTHROPIC_API_KEY is not set: skipping the API run. Showing the plan instead.\n")
+            print(f"{prov['env']} is not set: skipping the API run. Showing the plan instead.\n")
         for name in a.examples:
             data, _ = load(name)
             print(f"## {name}")
@@ -287,16 +344,28 @@ def main():
                 print(f"  {i:2}. [{k}] {q}\n      -> {e}")
         chars = sum(len(p) for _, _, p, _ in plan)
         print(f"\n{len(plan)} requests x {a.repeats} repeat(s), ~{chars // 4:,} input tokens total "
-              f"(model {a.model}, effort {a.effort}).")
+              f"(provider {a.provider}, model {a.model}).")
         return 0
 
-    import anthropic
+    if a.provider == "anthropic":
+        import anthropic
 
-    client = anthropic.Anthropic()
+        client = anthropic.Anthropic()
+
+        def run(user):
+            return ask(client, a.model, a.effort, user)
+        label = f"{a.model}, effort {a.effort}"
+        stem = "qa"
+    else:
+        def run(user):
+            return ask_openai(base_url, key, a.model, user)
+        label = f"{a.model} via {a.provider}, temperature 0"
+        stem = "qa-" + re.sub(r"[^A-Za-z0-9.]+", "-", a.model).strip("-").lower()
+
     results = []
     for rep in range(a.repeats):
         for name, fmt_name, user, qs in plan:
-            text, stop, in_tok = ask(client, a.model, a.effort, user)
+            text, stop, in_tok = run(user)
             answers = parse_answers(text, len(qs))
             ok = [grade(ans, e, k) for ans, (_, e, k) in zip(answers, qs)]
             results.append({"example": name, "format": fmt_name, "repeat": rep, "stop_reason": stop,
@@ -305,9 +374,9 @@ def main():
             print(f"{name:13s} {fmt_name:22s} {sum(ok):2d}/10  in={in_tok}  {stop}", flush=True)
 
     RES.mkdir(parents=True, exist_ok=True)
-    (RES / "qa.json").write_text(json.dumps(results, ensure_ascii=False, indent=1), encoding="utf-8")
+    (RES / f"{stem}.json").write_text(json.dumps(results, ensure_ascii=False, indent=1), encoding="utf-8")
     fmts = list(dict.fromkeys(r["format"] for r in results))
-    md = [f"# Comprehension benchmark ({a.model}, effort {a.effort}, {a.repeats} repeat(s))", "",
+    md = [f"# Comprehension benchmark ({label}, {a.repeats} repeat(s))", "",
           "| format | " + " | ".join(a.examples) + " | total | accuracy | mean input tokens |",
           "|---|" + "---:|" * (len(a.examples) + 3)]
     for f in fmts:
@@ -317,11 +386,13 @@ def main():
             e = [r for r in rs if r["example"] == ex]
             cells.append(f"{sum(r['correct'] for r in e)}/{sum(r['total'] for r in e)}" if e else "–")
         c, t = sum(r["correct"] for r in rs), sum(r["total"] for r in rs)
-        md.append(f"| {f} | " + " | ".join(cells) + f" | {c}/{t} | {100 * c / t:.1f}% | "
-                  f"{sum(r['input_tokens'] for r in rs) / len(rs):.0f} |")
-    refusals = [r for r in results if r["stop_reason"] == "refusal"]
-    md += ["", f"Refusals: {len(refusals)}"]
-    (RES / "qa.md").write_text("\n".join(md) + "\n", encoding="utf-8")
+        toks = [r["input_tokens"] for r in rs if r["input_tokens"] is not None]
+        mean = f"{sum(toks) / len(toks):.0f}" if toks else "–"
+        md.append(f"| {f} | " + " | ".join(cells) + f" | {c}/{t} | {100 * c / t:.1f}% | {mean} |")
+    refusals = [r for r in results if r["stop_reason"] in ("refusal", "content_filter")]
+    cut = [r for r in results if r["stop_reason"] in ("max_tokens", "length")]
+    md += ["", f"Refusals: {len(refusals)}  ·  Cut off by the output limit: {len(cut)}"]
+    (RES / f"{stem}.md").write_text("\n".join(md) + "\n", encoding="utf-8")
     print("\n".join(md))
     return 0
 
