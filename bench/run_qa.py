@@ -4,9 +4,11 @@ every format and compare accuracy.
     python bench/run_qa.py --dry-run          # show questions, answers, prompt sizes
     ANTHROPIC_API_KEY=... python bench/run_qa.py [--model claude-opus-5] [--repeats 3]
     NVIDIA_API_KEY=nvapi-... python bench/run_qa.py --provider nvidia [--model openai/gpt-oss-20b]
+    GROQ_API_KEY=gsk_... python bench/run_qa.py --provider groq [--model openai/gpt-oss-20b]
     OPENAI_API_KEY=... python bench/run_qa.py --provider openai --base-url URL --model NAME
 
-`--provider nvidia` uses NVIDIA's OpenAI-compatible API (build.nvidia.com); `openai`
+`--provider nvidia` uses NVIDIA's OpenAI-compatible API (build.nvidia.com), `groq` uses
+Groq's (console.groq.com; the free tier allows 8k tokens per minute, so runs pause on 429); `openai`
 works with any OpenAI-compatible endpoint. These need no extra package.
 
 Each (example, format) pair is one request containing the data and all 10
@@ -254,21 +256,26 @@ PROVIDERS = {
     "anthropic": {"env": "ANTHROPIC_API_KEY", "model": "claude-opus-5", "base_url": None},
     "nvidia": {"env": "NVIDIA_API_KEY", "model": "deepseek-ai/deepseek-v4.1-flash",
                "base_url": "https://integrate.api.nvidia.com/v1"},
+    # Groq's free tier allows 8k tokens per minute *including* max_tokens, and the largest
+    # prompt is ~5.9k tokens: keep the output cap at 2000 and gpt-oss reasoning short.
+    "groq": {"env": "GROQ_API_KEY", "model": "openai/gpt-oss-120b",
+             "base_url": "https://api.groq.com/openai/v1", "max_tokens": 2000,
+             "extra": {"reasoning_effort": "low"}},
     "openai": {"env": "OPENAI_API_KEY", "model": "gpt-5-mini", "base_url": "https://api.openai.com/v1"},
 }
 
 _THINK = re.compile(r"<think>.*?(</think>|$)", re.S)
 
 
-def ask_openai(base_url, key, model, user, max_tokens=16000):
+def ask_openai(base_url, key, model, user, max_tokens=4000, extra=None):
     """One chat completion from an OpenAI-compatible endpoint (stdlib only)."""
-    body = json.dumps({"model": model, "temperature": 0, "max_tokens": max_tokens,
+    body = json.dumps({"model": model, "temperature": 0, "max_tokens": max_tokens, **(extra or {}),
                        "messages": [{"role": "system", "content": SYSTEM},
                                     {"role": "user", "content": user}]}).encode()
     req = urllib.request.Request(base_url.rstrip("/") + "/chat/completions", data=body, headers={
         "Authorization": f"Bearer {key}", "Content-Type": "application/json",
         "Accept": "application/json"})
-    for attempt in range(6):
+    for attempt in range(10):
         try:
             with urllib.request.urlopen(req, timeout=600) as r:
                 d = json.load(r)
@@ -276,7 +283,13 @@ def ask_openai(base_url, key, model, user, max_tokens=16000):
         except urllib.error.HTTPError as e:
             detail = e.read()[:300].decode("utf-8", "replace")
             if e.code in (429, 500, 502, 503, 504):
-                time.sleep(min(60, 2 ** attempt * 5))
+                wait = e.headers.get("retry-after") if e.headers else None
+                try:
+                    wait = min(90, float(wait)) + 1
+                except (TypeError, ValueError):
+                    wait = min(60, 2 ** attempt * 5)
+                print(f"  (HTTP {e.code}, waiting {wait:.0f}s)", flush=True)
+                time.sleep(wait)
                 continue
             raise RuntimeError(f"HTTP {e.code} from {base_url}: {detail}") from None
         except (urllib.error.URLError, TimeoutError):
@@ -313,6 +326,8 @@ def main():
     ap.add_argument("--model", default=os.environ.get("BPP_QA_MODEL"),
                     help="default: claude-opus-5 / deepseek-ai/deepseek-v4.1-flash / gpt-5-mini")
     ap.add_argument("--base-url", help="OpenAI-compatible endpoint (overrides the provider's)")
+    ap.add_argument("--max-tokens", type=int,
+                    help="output limit for OpenAI-compatible providers (default 4000; groq 2000)")
     ap.add_argument("--effort", default="low", choices=["low", "medium", "high", "xhigh", "max"],
                     help="Anthropic only")
     ap.add_argument("--repeats", type=int, default=1)
@@ -358,8 +373,11 @@ def main():
         stem = "qa"
     else:
         def run(user):
-            return ask_openai(base_url, key, a.model, user)
-        label = f"{a.model} via {a.provider}, temperature 0"
+            return ask_openai(base_url, key, a.model, user, max_tok, extra)
+        max_tok = a.max_tokens or prov.get("max_tokens", 4000)
+        extra = prov.get("extra") if a.model.startswith("openai/gpt-oss") else None
+        label = f"{a.model} via {a.provider}, temperature 0" + (
+            f", reasoning {extra['reasoning_effort']}" if extra else "")
         stem = "qa-" + re.sub(r"[^A-Za-z0-9.]+", "-", a.model).strip("-").lower()
 
     results = []

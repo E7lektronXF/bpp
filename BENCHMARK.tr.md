@@ -119,6 +119,7 @@ OpenAI-compatible (OpenAI biçimini kullanan) her API de ek paket gerekmeden ça
 export NVIDIA_API_KEY=nvapi-...                    # build.nvidia.com'dan ücretsiz anahtar
 python bench/run_qa.py --provider nvidia           # deepseek-ai/deepseek-v4.1-flash, temperature 0
 python bench/run_qa.py --provider nvidia --model openai/gpt-oss-20b
+python bench/run_qa.py --provider groq                 # GROQ_API_KEY, openai/gpt-oss-120b, fast
 python bench/run_qa.py --provider openai --base-url https://.../v1 --model NAME   # OPENAI_API_KEY
 ```
 

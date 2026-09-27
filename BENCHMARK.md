@@ -121,6 +121,7 @@ Any OpenAI-compatible API works too, with no extra package. Results go to
 export NVIDIA_API_KEY=nvapi-...                    # free key from build.nvidia.com
 python bench/run_qa.py --provider nvidia           # deepseek-ai/deepseek-v4.1-flash, temperature 0
 python bench/run_qa.py --provider nvidia --model openai/gpt-oss-20b
+python bench/run_qa.py --provider groq                 # GROQ_API_KEY, openai/gpt-oss-120b, fast
 python bench/run_qa.py --provider openai --base-url https://.../v1 --model NAME   # OPENAI_API_KEY
 ```
 
