@@ -262,7 +262,9 @@ PROVIDERS = {
              "base_url": "https://api.groq.com/openai/v1", "max_tokens": 2000,
              # per model family: shortest reasoning gpt-oss allows; thinking off for Qwen
              "extra": {"openai/gpt-oss": {"reasoning_effort": "low"},
-                       "qwen/": {"reasoning_effort": "none"}}},
+                       "qwen/": {"reasoning_effort": "none"}},
+             # Qwen's tokenizer is less efficient on this data; with thinking off 800 is plenty
+             "family_max_tokens": {"qwen/": 800}},
     "openai": {"env": "OPENAI_API_KEY", "model": "gpt-5-mini", "base_url": "https://api.openai.com/v1"},
 }
 
@@ -295,6 +297,10 @@ def ask_openai(base_url, key, model, user, max_tokens=4000, extra=None):
                 print(f"  (HTTP {e.code}, waiting {wait:.0f}s)", flush=True)
                 time.sleep(wait)
                 continue
+            if e.code == 413 or "too large" in detail.lower() or "context" in detail.lower():
+                print(f"  (HTTP {e.code}: request too large for this provider/model, skipped: "
+                      f"{detail[:160]})", flush=True)
+                return "", "too_large", None
             raise RuntimeError(f"HTTP {e.code} from {base_url}: {detail}") from None
         except (urllib.error.URLError, TimeoutError):
             time.sleep(min(60, 2 ** attempt * 5))
@@ -378,24 +384,42 @@ def main():
     else:
         def run(user):
             return ask_openai(base_url, key, a.model, user, max_tok, extra)
-        max_tok = a.max_tokens or prov.get("max_tokens", 4000)
+        fam = next((v for k, v in prov.get("family_max_tokens", {}).items()
+                    if a.model.startswith(k)), None)
+        max_tok = a.max_tokens or fam or prov.get("max_tokens", 4000)
         extra = next((v for k, v in prov.get("extra", {}).items() if a.model.startswith(k)), None)
         label = f"{a.model} via {a.provider}, temperature 0" + (
             f", reasoning {extra['reasoning_effort']}" if extra else "")
         stem = "qa-" + re.sub(r"[^A-Za-z0-9.]+", "-", a.model).strip("-").lower()
 
+    # Every answer is appended to a .partial.jsonl file right away; running the same
+    # command again resumes where it stopped instead of starting over.
+    RES.mkdir(parents=True, exist_ok=True)
+    partial = RES / f"{stem}.partial.jsonl"
+    done = {}
+    if partial.exists():
+        for line in partial.read_text(encoding="utf-8").splitlines():
+            if line.strip():
+                r = json.loads(line)
+                done[(r["example"], r["format"], r["repeat"])] = r
+        if done:
+            print(f"Resuming: {len(done)} answers already saved in {partial.name}", flush=True)
     results = []
     for rep in range(a.repeats):
         for name, fmt_name, user, qs in plan:
+            if (name, fmt_name, rep) in done:
+                results.append(done[(name, fmt_name, rep)])
+                continue
             text, stop, in_tok = run(user)
             answers = parse_answers(text, len(qs))
             ok = [grade(ans, e, k) for ans, (_, e, k) in zip(answers, qs)]
             results.append({"example": name, "format": fmt_name, "repeat": rep, "stop_reason": stop,
                             "input_tokens": in_tok, "correct": sum(ok), "total": len(qs),
                             "answers": answers, "expected": [e for _, e, _ in qs]})
+            with partial.open("a", encoding="utf-8") as fh:
+                fh.write(json.dumps(results[-1], ensure_ascii=False) + "\n")
             print(f"{name:13s} {fmt_name:22s} {sum(ok):2d}/10  in={in_tok}  {stop}", flush=True)
 
-    RES.mkdir(parents=True, exist_ok=True)
     (RES / f"{stem}.json").write_text(json.dumps(results, ensure_ascii=False, indent=1), encoding="utf-8")
     fmts = list(dict.fromkeys(r["format"] for r in results))
     md = [f"# Comprehension benchmark ({label}, {a.repeats} repeat(s))", "",
@@ -410,11 +434,11 @@ def main():
         c, t = sum(r["correct"] for r in rs), sum(r["total"] for r in rs)
         toks = [r["input_tokens"] for r in rs if r["input_tokens"] is not None]
         mean = f"{sum(toks) / len(toks):.0f}" if toks else "–"
-        cutn = sum(r["stop_reason"] in ("max_tokens", "length") for r in rs)
+        cutn = sum(r["stop_reason"] in ("max_tokens", "length", "too_large") for r in rs)
         md.append(f"| {f} | " + " | ".join(cells) + f" | {c}/{t} | {100 * c / t:.1f}% | {mean} | {cutn} |")
     refusals = [r for r in results if r["stop_reason"] in ("refusal", "content_filter")]
-    cut = [r for r in results if r["stop_reason"] in ("max_tokens", "length")]
-    md += ["", f"Refusals: {len(refusals)}  ·  Cut off by the output limit: {len(cut)} requests "
+    cut = [r for r in results if r["stop_reason"] in ("max_tokens", "length", "too_large")]
+    md += ["", f"Refusals: {len(refusals)}  ·  Cut off or rejected as too large: {len(cut)} requests "
            "(their unanswered questions count as wrong; 'cut off' is per format)"]
     (RES / f"{stem}.md").write_text("\n".join(md) + "\n", encoding="utf-8")
     print("\n".join(md))
