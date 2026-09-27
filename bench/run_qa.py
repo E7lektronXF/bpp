@@ -4,7 +4,7 @@ every format and compare accuracy.
     python bench/run_qa.py --dry-run          # show questions, answers, prompt sizes
     ANTHROPIC_API_KEY=... python bench/run_qa.py [--model claude-opus-5] [--repeats 3]
     NVIDIA_API_KEY=nvapi-... python bench/run_qa.py --provider nvidia [--model openai/gpt-oss-20b]
-    GROQ_API_KEY=gsk_... python bench/run_qa.py --provider groq [--model openai/gpt-oss-20b]
+    GROQ_API_KEY=gsk_... python bench/run_qa.py --provider groq [--model qwen/qwen3.8-27b]
     OPENAI_API_KEY=... python bench/run_qa.py --provider openai --base-url URL --model NAME
 
 `--provider nvidia` uses NVIDIA's OpenAI-compatible API (build.nvidia.com), `groq` uses
@@ -260,7 +260,9 @@ PROVIDERS = {
     # prompt is ~5.9k tokens: keep the output cap at 2000 and gpt-oss reasoning short.
     "groq": {"env": "GROQ_API_KEY", "model": "openai/gpt-oss-120b",
              "base_url": "https://api.groq.com/openai/v1", "max_tokens": 2000,
-             "extra": {"reasoning_effort": "low"}},
+             # per model family: shortest reasoning gpt-oss allows; thinking off for Qwen
+             "extra": {"openai/gpt-oss": {"reasoning_effort": "low"},
+                       "qwen/": {"reasoning_effort": "none"}}},
     "openai": {"env": "OPENAI_API_KEY", "model": "gpt-5-mini", "base_url": "https://api.openai.com/v1"},
 }
 
@@ -377,7 +379,7 @@ def main():
         def run(user):
             return ask_openai(base_url, key, a.model, user, max_tok, extra)
         max_tok = a.max_tokens or prov.get("max_tokens", 4000)
-        extra = prov.get("extra") if a.model.startswith("openai/gpt-oss") else None
+        extra = next((v for k, v in prov.get("extra", {}).items() if a.model.startswith(k)), None)
         label = f"{a.model} via {a.provider}, temperature 0" + (
             f", reasoning {extra['reasoning_effort']}" if extra else "")
         stem = "qa-" + re.sub(r"[^A-Za-z0-9.]+", "-", a.model).strip("-").lower()
@@ -397,8 +399,8 @@ def main():
     (RES / f"{stem}.json").write_text(json.dumps(results, ensure_ascii=False, indent=1), encoding="utf-8")
     fmts = list(dict.fromkeys(r["format"] for r in results))
     md = [f"# Comprehension benchmark ({label}, {a.repeats} repeat(s))", "",
-          "| format | " + " | ".join(a.examples) + " | total | accuracy | mean input tokens |",
-          "|---|" + "---:|" * (len(a.examples) + 3)]
+          "| format | " + " | ".join(a.examples) + " | total | accuracy | mean input tokens | cut off |",
+          "|---|" + "---:|" * (len(a.examples) + 4)]
     for f in fmts:
         rs = [r for r in results if r["format"] == f]
         cells = []
@@ -408,10 +410,12 @@ def main():
         c, t = sum(r["correct"] for r in rs), sum(r["total"] for r in rs)
         toks = [r["input_tokens"] for r in rs if r["input_tokens"] is not None]
         mean = f"{sum(toks) / len(toks):.0f}" if toks else "–"
-        md.append(f"| {f} | " + " | ".join(cells) + f" | {c}/{t} | {100 * c / t:.1f}% | {mean} |")
+        cutn = sum(r["stop_reason"] in ("max_tokens", "length") for r in rs)
+        md.append(f"| {f} | " + " | ".join(cells) + f" | {c}/{t} | {100 * c / t:.1f}% | {mean} | {cutn} |")
     refusals = [r for r in results if r["stop_reason"] in ("refusal", "content_filter")]
     cut = [r for r in results if r["stop_reason"] in ("max_tokens", "length")]
-    md += ["", f"Refusals: {len(refusals)}  ·  Cut off by the output limit: {len(cut)}"]
+    md += ["", f"Refusals: {len(refusals)}  ·  Cut off by the output limit: {len(cut)} requests "
+           "(their unanswered questions count as wrong; 'cut off' is per format)"]
     (RES / f"{stem}.md").write_text("\n".join(md) + "\n", encoding="utf-8")
     print("\n".join(md))
     return 0
