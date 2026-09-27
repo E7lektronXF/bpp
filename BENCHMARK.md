@@ -2,10 +2,10 @@
 
 > Türkçe: [BENCHMARK.tr.md](BENCHMARK.tr.md)
 
-Short answer: **on tokens, yes, and it is measured. On comprehension, not yet known**: no
-`ANTHROPIC_API_KEY` was available when these results were produced. The comprehension benchmark
-is written and ready to run (§3). Every number below can be reproduced with the scripts in the
-repository:
+Short answer: **on tokens, yes, and it is measured. On comprehension, a first measurement says
+bpp is as accurate as JSON**: within the 2-point bar set before the run, on two open-weight
+models (§3). That measurement is small and the caveats are listed with it. Every number below
+can be reproduced with the scripts in the repository:
 
 ```bash
 python bench/make_examples.py   # generates the examples/ folder
@@ -89,7 +89,7 @@ Detailed tables, including the dictionary-free `--no-refs` variant: `bench/resul
 dictionary. With it disabled (`--no-refs`), .bpp takes 2921 / 2952 tokens on logs, only 8% / 9%
 less than CSV. TOON has no dictionary mechanism.
 
-## 3. Comprehension benchmark (not yet run)
+## 3. Comprehension benchmark (first results)
 
 For each example, `bench/run_qa.py` generates **10 questions** whose answers are computed from
 the data:
@@ -100,7 +100,7 @@ the data:
 * dependencies and parents ("which steps does 5.2 depend on"),
 * resolving dictionary references (the log messages).
 
-The same questions are sent to Claude together with the data in each format, one request per
+The same questions are sent to a model together with the data in each format, one request per
 format. Answers are graded automatically: numeric comparison for numbers, set equality for lists
 and normalized equality for text. `--dry-run` prints all questions and expected answers, and the
 grading logic is covered by `tests/test_bench.py`.
@@ -129,7 +129,38 @@ The default run is 39 requests and about 60k input tokens. Refusal fallback is d
 **off**: a fallback would answer with a different model and spoil the comparison. Refusals count
 as wrong answers and are reported.
 
-**Comprehension risks (hypotheses, not measured):**
+### 3.1 Results (2026-09-27)
+
+**Bar, set before the run:** bpp within 2 points of JSON's accuracy counts as "same accuracy".
+
+| model (Groq free tier, temperature 0) | rounds | JSON (pretty) | JSON (minified) | YAML | **bpp** | bpp + primer |
+|---|---:|---:|---:|---:|---:|---:|
+| openai/gpt-oss-120b, reasoning low | 2 (120 q) | 85.8% | 85.0% | 80.0% | **84.2%** | 77.5% |
+| qwen/qwen3.8-27b, thinking off | 1 (60 q) | 73.3%\* | 80.0% | 81.7% | **80.0%** | 81.7% |
+
+\* The pretty-JSON logs request was cut off or rejected (it is the largest prompt, close to the
+free tier's 8k tokens per minute) and counts as 0/10. Without logs, pretty JSON, minified JSON and bpp all score 44/50.
+
+Per-dataset tables: [`bench/results/qa-openai-gpt-oss-120b.md`](bench/results/qa-openai-gpt-oss-120b.md),
+[`bench/results/qa-qwen-qwen3.8-27b.md`](bench/results/qa-qwen-qwen3.8-27b.md).
+
+**Reading it:**
+
+* bpp passed the bar on both models: −1.6 points vs pretty JSON on gpt-oss-120b (2 of 120
+  questions), equal to minified JSON on qwen.
+* The samples are small: one question is 0.8 points on gpt-oss-120b and 1.7 on qwen. None of
+  the differences between JSON, YAML and bpp here is larger than a few questions.
+* 7 of 66 gpt-oss-120b requests hit the 2000-token output cap (needed to fit the free tier's
+  per-minute budget) and count as wrong; the 0/20 cells for YAML and bpp + primer on logs are
+  most likely cut-offs, not misreadings. Later runs report cut-offs per format.
+* **logs** (counting over 80 entries) is hard for every format (0–8/20). It is also where the
+  dictionary is used; bpp 5/20 vs pretty JSON 8/20 on gpt-oss-120b is within the noise above,
+  but it is the one place to re-measure with `--no-refs`.
+* **The primer made no consistent difference:** 77.5% vs 84.2% on gpt-oss-120b (mostly the logs
+  cut-offs), 81.7% vs 80.0% on qwen (one question).
+* Not yet measured on Claude, GPT or Gemini models.
+
+### 3.2 Comprehension risks (the hypotheses before the run)
 
 1. **Dictionary indirection.** The model has to resolve `*3` to the `&3` definition. The logs
    question "how many entries have this message" measures exactly this. The biggest saving

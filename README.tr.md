@@ -295,8 +295,13 @@ token) kazancı silebilir; BENCHMARK §4.2'ye bakın.
 | tekrarlı loglar | 5629 | 4109 | 3348 | **1857** | −%42 (CSV) |
 
 o200k token'ı. claude2 tokenizer'ı ile sonuçlar aynı yönde. Ayrıntılar, anlama testi ve
-kaybedilen durumların analizi için [BENCHMARK.tr.md](BENCHMARK.tr.md). **Not:** anlama/doğruluk testi
-yazıldı ama API anahtarı olmadığı için henüz çalıştırılmadı (`python bench/run_qa.py`).
+kaybedilen durumların analizi için [BENCHMARK.tr.md](BENCHMARK.tr.md). 
+
+**Anlama testi (ilk ölçüm):** 6 veri seti, her birinde otomatik puanlanan 10 soru. Başarı çizgisi
+testten önce belirlendi: JSON'a en fazla 2 puan yakınlık "aynı doğruluk" sayılır.
+gpt-oss-120b: **bpp %84.2, pretty JSON %85.8** (120 soruda 2 soru). qwen3.8-27b: **bpp ve minified
+JSON %80.0**. İki küçük açık model ve küçük örneklem; primer tutarlı bir fark yaratmadı, logs örneği
+her formatta zor. Ayrıntılar ve çekinceler: [BENCHMARK.tr.md §3](BENCHMARK.tr.md).
 
 ## Kurulum seçenekleri (geliştiriciler için)
 

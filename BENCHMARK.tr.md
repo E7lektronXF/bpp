@@ -2,9 +2,10 @@
 
 > English: [BENCHMARK.md](BENCHMARK.md)
 
-Kısa cevap: **token tarafında evet, ölçüldü. Anlama tarafında henüz bilinmiyor**, çünkü bu
-ortamda `ANTHROPIC_API_KEY` yoktu. Anlama testi yazıldı ve çalışmaya hazır (§3). Aşağıdaki her
-sayı depodaki betiklerle yeniden üretilebilir:
+Kısa cevap: **token tarafında evet, ölçüldü. Anlama tarafında ilk ölçüm, bpp'nin JSON kadar
+doğru okunduğunu gösteriyor**: iki açık modelde, testten önce belirlenen 2 puanlık çizginin
+içinde (§3). Ölçüm küçük; çekinceler yanında yazılı. Aşağıdaki her sayı depodaki betiklerle
+yeniden üretilebilir:
 
 ```bash
 python bench/make_examples.py   # examples/ klasörünü üretir
@@ -88,7 +89,7 @@ Ayrıntılı tablolar (sözlüksüz `--no-refs` varyantı dahil): `bench/results
 (`--no-refs`) .bpp logs'ta 2921 / 2952 token, yani CSV'den yalnızca −%8 / −%9 ucuz. TOON'da sözlük
 mekanizması yoktur.
 
-## 3. Anlama testi (çalıştırılmadı)
+## 3. Anlama testi (ilk sonuçlar)
 
 `bench/run_qa.py` her örnek için veriden hesaplanan cevaplarıyla **10 soru** üretir:
 
@@ -127,7 +128,37 @@ Varsayılan çalıştırma 39 istek ve ~60 bin giriş token'ıdır. Refusal fall
 bir fallback başka bir modelle cevap verip karşılaştırmayı bozardı. Refusal'lar yanlış sayılır ve
 raporlanır.
 
-**Anlama tarafındaki riskler (hipotezler, ölçülmedi):**
+### 3.1 Sonuçlar (2026-09-27)
+
+**Testten önce belirlenen çizgi:** bpp'nin doğruluğu JSON'dan en fazla 2 puan düşükse "aynı doğruluk".
+
+| model (Groq ücretsiz katman, temperature 0) | tur | JSON (pretty) | JSON (minified) | YAML | **bpp** | bpp + primer |
+|---|---:|---:|---:|---:|---:|---:|
+| openai/gpt-oss-120b, reasoning low | 2 (120 soru) | %85.8 | %85.0 | %80.0 | **%84.2** | %77.5 |
+| qwen/qwen3.8-27b, düşünme kapalı | 1 (60 soru) | %73.3\* | %80.0 | %81.7 | **%80.0** | %81.7 |
+
+\* Pretty JSON'un logs isteği kesildi ya da reddedildi (en büyük prompt, ücretsiz katmanın dakikalık
+8k token sınırına yakın) ve 0/10 sayıldı. Logs hariç pretty JSON, minified JSON ve bpp üçü de 44/50.
+
+Örnek bazında tablolar: [`bench/results/qa-openai-gpt-oss-120b.md`](bench/results/qa-openai-gpt-oss-120b.md),
+[`bench/results/qa-qwen-qwen3.8-27b.md`](bench/results/qa-qwen-qwen3.8-27b.md).
+
+**Nasıl okunmalı:**
+
+* bpp iki modelde de çizgiyi geçti: gpt-oss-120b'de pretty JSON'a göre −1.6 puan (120 soruda 2
+  soru), qwen'de minified JSON'la eşit.
+* Örneklem küçük: bir soru gpt-oss-120b'de 0.8, qwen'de 1.7 puan. JSON, YAML ve bpp arasındaki
+  farkların hiçbiri birkaç sorudan büyük değil.
+* gpt-oss-120b'deki 66 isteğin 7'si 2000 token'lık çıktı sınırına takıldı ve yanlış sayıldı;
+  logs'taki YAML ve bpp + primer 0/20 hücreleri büyük ihtimalle kesilme, yanlış okuma değil.
+* **logs** (80 kayıt üzerinde sayma) her formatta zor (0–8/20). Sözlüğün kullanıldığı yer de
+  burası; gpt-oss-120b'de bpp 5/20, pretty JSON 8/20 gürültü içinde, ama `--no-refs` ile yeniden
+  ölçülecek tek yer burası.
+* **Primer tutarlı bir fark yaratmadı:** gpt-oss-120b'de %77.5'e karşı %84.2 (çoğu logs'taki
+  kesilmeler), qwen'de %81.7'ye karşı %80.0 (tek soru).
+* Claude, GPT ve Gemini modellerinde henüz ölçülmedi.
+
+### 3.2 Anlama tarafındaki riskler (testten önceki hipotezler)
 
 1. **Sözlük dolaylılığı.** Model `*3`'ü `&3` tanımına çözmek zorunda. Logs'taki "şu mesaja sahip
    kaç kayıt var" sorusu tam bunu ölçer. En büyük kazanç (logs −%42) en büyük anlama riskini

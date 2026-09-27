@@ -8,6 +8,11 @@ language models read with far fewer tokens. You can convert it back without losi
   every example.
 * **Lossless round trip:** `decode(encode(x)) == x` for JSON and YAML, with types preserved.
   CSV cells come back byte for byte. Markdown plans keep their structure.
+* **Same accuracy as JSON in a first comprehension test.** 6 datasets, 10 auto-graded questions
+  each, same data in every format. We set the bar before running: within 2 points of JSON counts
+  as "same accuracy". gpt-oss-120b: **84.2% from bpp vs 85.8% from pretty JSON** (2 of 120
+  questions). qwen3.8-27b: **80.0% from bpp and from minified JSON**. Small open models, small
+  samples; the caveats are [below](#honest-caveats).
 * **Measured, not invented.** Every syntax choice was benchmarked on two tokenizers. There are no
   made-up symbols or binary tricks, only patterns models already know from YAML, CSV, JSON and
   TypeScript.
@@ -234,11 +239,17 @@ YAML and Markdown trees.
 
 ## Honest caveats
 
-* **Understanding is not measured yet.** Token savings are measured. Whether models answer
-  questions about bpp as accurately as about JSON is not yet known. A ready-to-run comprehension
-  benchmark (10 auto-graded questions per dataset, every format) is included:
-  `ANTHROPIC_API_KEY=... python bench/run_qa.py`. The biggest risk is the dictionary: the model
-  has to resolve `*3` to its definition.
+* **Comprehension is measured, but only a little.** Two open-weight models on Groq's free tier
+  (gpt-oss-120b, 2 rounds; qwen3.8-27b, 1 round), so one question moves accuracy by 0.8–1.7
+  points. bpp stayed within the 2-point bar we set in advance. Not yet run on Claude, GPT or
+  Gemini; `python bench/run_qa.py` reproduces it with any of them (full tables:
+  [BENCHMARK §3](BENCHMARK.md#3-comprehension-benchmark-first-results)).
+* **The logs example is hard for every format** (counting over 80 entries: 0–8 of 20 right).
+  It is also where the `*n` dictionary does its work; bpp got 5/20 there vs 8/20 for pretty JSON
+  on gpt-oss-120b. Output-limit cut-offs (7 of 66 requests on that model, counted as wrong) blur
+  the difference, so a `--no-refs` run is the next measurement.
+* **The primer made no consistent difference:** −6.7 points on gpt-oss-120b (mostly logs
+  cut-offs), +1.7 on qwen (one question). Without it, bpp already met the bar.
 * **Token counts are proxies.** They come from tiktoken `o200k_base` and Anthropic's older public
   Claude tokenizer. Current Claude models use a different tokenizer. Set `ANTHROPIC_API_KEY` and
   `bpp stats` adds real `count_tokens` numbers.
