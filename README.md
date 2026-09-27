@@ -300,7 +300,8 @@ pip install -e ".[dev]"        # + pytest, hypothesis, tiktoken
 pytest -q                      # 240 tests
 python bench/run_tokens.py     # regenerate the token benchmark
 python bench/experiments.py    # the design experiments behind SPEC.md
-python bench/run_qa.py         # comprehension benchmark (needs ANTHROPIC_API_KEY)
+GROQ_API_KEY=... python bench/run_qa.py --provider groq   # comprehension benchmark on Groq's free tier
+                               # (also --provider anthropic, nvidia or openai)
 ```
 
 The TOON column needs Node.js and `cd bench/toon && npm install`.
