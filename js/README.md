@@ -8,7 +8,7 @@ thousands of generated documents through both and compares them.
 import { encode, decode, parseJSON, stringifyJSON } from './bpp.js';
 
 const text = encode({ users: [{ id: 1, name: 'Ada' }, { id: 2, name: 'Linus' }] });
-// bpp2
+// bpp4
 // users[2]{id name}
 // 1 Ada
 // 2 Linus
@@ -22,6 +22,8 @@ console.log(stringifyJSON(data));     // back to JSON text
   `"10"`) and the difference between `1` and `1.0` survive. `toPlain(value)` converts to plain
   JS objects and numbers.
 * `parseJSON(text)` / `stringifyJSON(value, indent)` read and write JSON in that exact model.
+* `encodeMD(markdown, options)` encodes a Markdown document like `bpp.encode_md`: its tree, or
+  `bpp4 md` followed by the source when that is shorter. `mdSource(text)` returns that source.
 * `mdToTree(markdown)`, `loadCSV(text)`, `dumpCSV(rows)` and `estTokens(text)` match the Python
   functions of the same purpose.
 

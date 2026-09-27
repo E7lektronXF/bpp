@@ -7,14 +7,14 @@ from bpp import BppError, decode, encode
 
 def body(text):
     lines = text.split("\n")
-    assert lines[0] == "bpp3"
+    assert lines[0] == "bpp4"
     return "\n".join(lines[1:]).rstrip("\n")
 
 
 def test_header_and_primer():
-    assert encode({"a": 1}) == "bpp3\na 1\n"
+    assert encode({"a": 1}) == "bpp4\na 1\n"
     t = encode({"a": 1}, primer=True)
-    assert t.startswith("bpp3\n# bpp3:") and decode(t) == {"a": 1}
+    assert t.startswith("bpp4\n# bpp4:") and decode(t) == {"a": 1}
     assert encode({"a": 1}, primer="long").count("\n#") == 3
 
 
@@ -29,7 +29,7 @@ def test_minimal_quoting():
 
 
 def test_unicode_not_escaped():
-    assert body(encode({"ş": "Çiğdem\nİ"})) == 'ş "Çiğdem\\nİ"'
+    assert body(encode({"ş": "Çiğdem\tİ"})) == 'ş "Çiğdem\\tİ"'
 
 
 def test_inline_list():
@@ -65,12 +65,12 @@ def test_frequent_optional_column_is_positional():
                                               {"title": "c", "status": "todo"},
                                               {"title": "-", "status": "-"}]}]}
     t = body(encode(x))
-    assert t == ('steps[1]{status? title}>steps\n'
+    assert t == ('steps[1]{status? title}>\n'
                  '- Plan\n'
                  ' done a b\n'
                  ' todo c\n'
                  ' "-" -')
-    assert decode("bpp3\n" + t) == x
+    assert decode("bpp4\n" + t) == x
 
 
 def test_bpp1_files_still_decode():
@@ -85,7 +85,7 @@ def test_bpp1_files_still_decode():
 def test_dictionary():
     msg = "Connection to upstream timed out after 30000ms"
     t = encode({"logs": [{"i": i, "m": msg} for i in range(5)]})
-    assert t.startswith(f"bpp3\n&0 {msg}\n") and "*0" in t
+    assert t.startswith(f"bpp4\n&0 {msg}\n") and "*0" in t
 
 
 def test_generic_list_items():

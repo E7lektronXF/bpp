@@ -9,9 +9,8 @@ from pathlib import Path
 import pytest
 
 import datasets as ds
-from bpp import decode, encode
+from bpp import decode, encode, encode_md
 from bpp.formats import dump_csv
-from bpp.markdown import md_to_tree
 from test_roundtrip import CASES
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -20,7 +19,11 @@ NODE = shutil.which("node")
 TRICKY = ["", " ", "a b", "1", "-1", "1.1", "1e5", "007", "null", "true", "NaN", "-", "- x",
           "*0", "&1", "#c", "a,b", "a]b", "[x", "{}", "k=v", "x y=z", "a:b", "\n", "a\nb",
           "\t", '"', "\\", "ç ğ ı İ ö ş ü", "Iğdır", "🚀 launch", "漢字", "Connection timed out",
-          "a long repeated sentence number one", "another long value, with a comma"]
+          "a long repeated sentence number one", "another long value, with a comma",
+          # bpp4: block strings and the relaxed `*` rule
+          "|3", "|0", "*12", "*x", "**bold** text", "first line.\n\nsecond line, longer text",
+          "  indented\n| pipe\nbpp3\n# not a comment\n", "a\r\nb", "x\n\n\ny\n", "k |2\nv",
+          "```sql\nSELECT 1;\n```\n\nDone: it works.", "|abc", "| x"]
 KEYS = ["id", "title", "status", "steps", "name", "note", "a b", "şehir", "", "42", "x?", "k:v"]
 
 
@@ -58,6 +61,29 @@ def rand_value(r: random.Random, depth=0):
     return rows
 
 
+MD_CASES = [
+    "- a\n  b\n- c  \n  d\n",
+    "# T\n\npara one\nwraps here\n\n    code\n\n| a | b |\n|---|---|\n",
+    "- [x] done item\nlazy continuation\n  - sub\n    wrapped\n",
+    "---\ntitle: x\ndate: y\n---\n\n# Doc\n\ntext\nmore\n",
+    "## H\n<pre>\na\nb\n</pre>\nc\nd\n\n<div>\ne\nf\n</div>\n\n$$\nx\ny\n$$\n",
+    "> quote\n> more\ntext\n\n[ref]: http://x\nnext\n\n***\nTitle\n===\n",
+    "1. one\n   two\n2) three\\\n   four\n",
+    "",
+    "just text",
+    "x\r\ny\r\n",
+]
+
+
+MD_VOCAB = [
+    "", "plain text", "more words here", "  indented", "    code", "|2", "| a | b |", "|---|",
+    "- item", "  - sub item", "  wrapped line", "1. one", "* star", "## Heading", "### Sub",
+    "```\ncode\n\n```", "> quote", "<div>", "</div>", "<pre>", "</pre>", "<!--", "-->", "$$",
+    "---", "===", "[r]: /x", "hard break  ", "back\\", "- [x] done", "- [ ] todo", "lazy text",
+    "bpp4", "*0", "k=v title", "\tTab", "ç ğ ı İ", "**bold** start", "Ünicode wrap",
+]
+
+
 def _back(text):
     return json.dumps(decode(text), ensure_ascii=False, separators=(",", ":"))
 
@@ -80,11 +106,17 @@ def corpus():
     r = random.Random(20260924)
     for _ in range(1500):
         add_json(rand_value(r), keep_order=r.random() < 0.3)
-    for md in (ROOT / "examples").glob("*.md"):
-        text = md.read_text(encoding="utf-8")
-        tree = md_to_tree(text)
-        cases.append({"md": text, "opts": {}, "bpp": encode(tree),
-                      "back": _back(encode(tree))})
+    mds = [p.read_text(encoding="utf-8") for p in sorted((ROOT / "examples").glob("*.md"))]
+    mds += [(ROOT / f).read_text(encoding="utf-8") for f in ("README.md", "SPEC.md", "BENCHMARK.md",
+                                                             "RELEASING.md", "README.tr.md")]
+    mds += MD_CASES
+    rm = random.Random(4)
+    for _ in range(300):
+        mds.append("\n".join(rm.choice(MD_VOCAB) for _ in range(rm.randrange(12))))
+    for text in mds:
+        for primer in (False, True):
+            out = encode_md(text, primer=primer)
+            cases.append({"md": text, "opts": {"primer": primer}, "bpp": out, "back": _back(out)})
     csv_text = dump_csv(ds.employees())
     from bpp.formats import load_csv
     rows = load_csv(csv_text)

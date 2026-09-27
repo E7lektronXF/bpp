@@ -2,24 +2,30 @@
 
 from __future__ import annotations
 
+import re
 from collections import Counter
 
 from .estimate import est_tokens
-from .lexer import NUM_RE, Ref, fmt_inline, fmt_key, fmt_scalar, fmt_seg, is_scalar, jstr
+from .lexer import (MD_HEADER, NUM_RE, Ref, block_ok, fmt_inline, fmt_key, fmt_scalar, fmt_seg,
+                    is_scalar, jstr)
 
-HEADER = "bpp3"
-PRIMER = ("# bpp3: JSON as 'key value' lines, 1-space indent nests. k[N]{a b.c}: N rows, values "
-          "in column order (b.c = key c of b), last one = rest of line; x? optional (- = absent), "
-          "x?= as x=v; >k: indented rows are k. \"...\" = JSON string, *n = &n.")
+HEADER = "bpp4"
 PRIMER_LONG = (
-    "# bpp3 = JSON data. Lines are 'key value'; a bare 'key' opens a nested object (1-space indent). [a,b] = list.\n"
+    "# bpp4 = JSON data. Lines are 'key value'; a bare 'key' opens a nested object (1-space indent). [a,b] = list.\n"
     "# k[N]{a b.c d}: N rows, values space-separated in column order, b.c = key c inside object b, "
     "last column = rest of line;\n"
-    "# x? = optional, '-' if absent; x?= written as x=v; >kids: indented rows are kids, >kids{...} gives "
-    "them their own columns. {a,b}: comma rows. k[N]: N '- ' items. \"...\" = JSON string. *n = &n value."
+    "# x? = optional, '-' if absent; x?= written as x=v; >kids: indented rows are kids (a bare > keeps "
+    "the table's key), >kids{...} gives them their own columns. {a,b}: comma rows. k[N]: N '- ' items. "
+    "\"...\" = JSON string. |N = the next N lines as a string. *n = &n value."
 )
+_NL_MERGE = re.compile(r"[!-/:-@\[-`{-~]\n|\n\n")
+_TABLE_HEAD = re.compile(r"\[[0-9]+\](\{.*)$")
 CHILD_KEYS = ("steps", "children", "subtasks", "tasks", "items", "nodes")
 MIN_REF_LEN = 8
+
+
+class _Raw(str):
+    """A line of a `|N` block (never scanned for syntax)."""
 
 
 def encode(data, *, primer: bool | str = False, refs: bool = True,
@@ -27,20 +33,125 @@ def encode(data, *, primer: bool | str = False, refs: bool = True,
     """Encode a JSON-compatible value as .bpp text.
 
     primer: add a one-line (True) or three-line ("long") explanation comment.
+        The one-line primer only explains the syntax the output uses.
     refs: allow the &n/*n dictionary for repeated long strings.
     keep_order: never reorder object keys (disables the row-table variant that
         moves its free-text column last).
     """
-    out = [HEADER]
-    if primer:
-        out.append(PRIMER_LONG if primer == "long" else PRIMER)
+    return _assemble(*_body(data, refs, keep_order), primer, markdown=False)
+
+
+def encode_md(text: str, *, primer: bool = False, refs: bool = True,
+              keep_order: bool = False) -> str:
+    """Encode a Markdown document (SPEC §7).
+
+    The document's tree (`md_to_tree`) is encoded as usual, with the Markdown
+    primer if asked for.  If the source text itself, behind a `bpp4 md` header
+    (SPEC §7.2), is estimated to be shorter, that is returned instead: it
+    decodes to the same tree, and `--to md` gives back the text unchanged.
+    """
+    from .markdown import md_to_tree
+
+    compact = _assemble(*_body(md_to_tree(text), refs, keep_order), primer, markdown=True)
+    raw = f"{MD_HEADER}\n{text}"
+    return raw if est_tokens(raw) < est_tokens(compact) else compact
+
+
+def _body(data, refs, keep_order):
     defs: list[str] = []
     if refs:
         data, defs = _extract_refs(data)
+    enc = _Enc(keep_order)
+    lines: list[str] = []
     for i, s in enumerate(defs):
-        out.append(f"&{i} {fmt_scalar(s)}")
-    out.extend(_Enc(keep_order).root(data))
+        enc.line(lines, f"&{i} {enc.scalar(s)}")
+    lines.extend(enc.root(data))
+    return lines, bool(defs)
+
+
+def _assemble(lines, has_refs, primer, markdown) -> str:
+    out = [HEADER]
+    if primer == "long":
+        out.append(PRIMER_LONG)
+    elif primer:
+        out.append(_primer(lines, has_refs, markdown))
+    out.extend(lines)
     return "\n".join(out) + "\n"
+
+
+# ----------------------------------------------------------------- primer
+
+def _features(lines, has_refs) -> set:
+    """The syntax a body uses, from its non-block lines."""
+    f = {"ref"} if has_refs else set()
+    for ln in lines:
+        if isinstance(ln, _Raw):
+            f.add("block")
+            continue
+        if '"' in ln:
+            f.add("quote")
+        m = _TABLE_HEAD.search(ln)
+        if not m:
+            continue
+        spec = m.group(1)
+        if " " not in spec and "," in spec and ">" not in spec:
+            f.add("comma")
+            continue
+        f.add("table")
+        f.update(k for k, pat in (("keyed", r"\?="), ("opt", r"\?(?!=)"), ("dotted", r"[^\s{]\.[^\s}]"),
+                                  ("child", r"\}>[^{\s]"), ("same", r"\}>(?:\{|$)"),
+                                  ("own", r"\}>[^{\s]*\{"), ("status", r"[{ ]status\?"),
+                                  ("note?", r"[{ ]note\?(?!=)"), ("note?=", r"[{ ]note\?="))
+                 if re.search(pat, spec))
+    return f
+
+
+def _primer(lines, has_refs, markdown) -> str:
+    f = _features(lines, has_refs)
+    if markdown:
+        head = "# bpp4 Markdown:"
+        rows = ["steps[N]{cols} = N headings/list items, cols in order, title = rest of line, "
+                "indented rows = sub-items" + (" (>{...}: own cols)" if "own" in f else "")]
+        if "status" in f:
+            rows.append("status: todo/done/doing/cancelled (- none)")
+        note = [x for k, x in (("note?", "note?"), ("note?=", "note=")) if k in f]
+        if note:
+            rows.append("/".join(note) + " its text" + (" (- none)" if "note?" in f else ""))
+    else:
+        head = "# bpp4: JSON as 'key value' lines, 1-space indent nests."
+        rows = []
+        if "table" in f:
+            rows.append("k[N]{a b.c}: N rows, values in column order (b.c = key c of b), last one = rest of line"
+                        if "dotted" in f else "k[N]{a b}: N rows, values in column order, last one = rest of line")
+        if "comma" in f:
+            rows.append("k[N]{a,b}: N comma rows")
+        if "opt" in f:
+            rows.append("x? optional (- = absent)")
+        if "keyed" in f:
+            rows.append("x?= as x=v")
+        if "child" in f or "same" in f:
+            rows.append({(True, False): ">k: indented rows are k",
+                         (False, True): ">: indented rows are children (same key)",
+                         (True, True): ">k: indented rows are k (bare >: same key)"}[
+                             ("child" in f, "same" in f)])
+    vals = [txt for k, txt in (("quote", '"..." = JSON string'), ("block", "|N = the next N lines"),
+                               ("ref", "*n = &n")) if k in f]
+    out = head
+    if rows:
+        out += " " + "; ".join(rows) + "."
+    if vals:
+        out += " " + ", ".join(vals) + "."
+    return out
+
+
+# ------------------------------------------------------------ block strings
+
+def block_gain(s: str) -> int:
+    """Estimated tokens saved by writing s (block_ok) as a `|N` block instead of a JSON string."""
+    # A raw newline merges with the punctuation before it (`):\n\n`); an escaped
+    # one does not, which the estimator alone misses (calibrated on o200k and claude2).
+    return (est_tokens(" " + jstr(s)) + len(_NL_MERGE.findall(s))
+            - est_tokens(f" |{s.count(chr(10)) + 1}") - est_tokens(s + "\n"))
 
 
 # ------------------------------------------------------------------ dictionary
@@ -104,12 +215,32 @@ def _str_col(values) -> bool:
 class _Enc:
     def __init__(self, keep_order: bool = False):
         self.keep_order = keep_order
+        self.pending: list[str] = []  # block lines of the line being built
+
+    # A string value that is cheaper as a `|N` block is written as `|N`; its
+    # lines wait in `pending` until `line()` has written the line it belongs to.
+    def scalar(self, v, ctx: str = "value", strmode: bool = False) -> str:
+        if isinstance(v, str) and block_ok(v) and block_gain(v) >= 0:
+            self.pending.extend(_Raw(x) for x in v.split("\n"))
+            return f"|{v.count(chr(10)) + 1}"
+        return fmt_scalar(v, ctx, strmode)
+
+    def inline(self, v, ctx: str = "value", strmode: bool = False) -> str | None:
+        return self.scalar(v, ctx, strmode) if is_scalar(v) else fmt_inline(v, ctx, strmode)
+
+    def line(self, out: list[str], text: str):
+        out.append(text)
+        out.extend(self.pending)
+        self.pending = []
 
     def root(self, v) -> list[str]:
         if isinstance(v, str):
-            return [jstr(v)]
-        if isinstance(v, dict) and v:
             lines: list[str] = []
+            text = self.scalar(v)  # a block, or else always a JSON string (SPEC §4.5)
+            self.line(lines, text if self.pending else jstr(v))
+            return lines
+        if isinstance(v, dict) and v:
+            lines = []
             for k, x in v.items():
                 self.entry(fmt_key(k), x, 0, lines)
             return lines
@@ -120,9 +251,9 @@ class _Enc:
 
     def entry(self, key: str, v, d: int, out: list[str]):
         pad = " " * d
-        inl = fmt_inline(v)
+        inl = self.inline(v)
         if inl is not None:
-            out.append(f"{pad}{key} {inl}")
+            self.line(out, f"{pad}{key} {inl}")
         elif isinstance(v, dict):
             out.append(pad + key)
             for k, x in v.items():
@@ -135,8 +266,8 @@ class _Enc:
         # Candidates in order of preference; ties go to the earlier one, so
         # order-preserving layouts win over the one that moves a column.
         cands = []
-        for c in (self.table(key, arr, d), self.outline(key, arr, d, keep_order=True),
-                  None if self.keep_order else self.outline(key, arr, d)):
+        for c in [self.table(key, arr, d), *self.outlines(key, arr, d, keep_order=True),
+                  *([] if self.keep_order else self.outlines(key, arr, d))]:
             if c and c not in cands:
                 cands.append(c)
         if not cands or len(arr) <= 2:
@@ -157,24 +288,50 @@ class _Enc:
         pad = " " * d
         lines = [f"{pad}{key}[{len(arr)}]{{{head}}}"]
         for x in arr:
-            lines.append(pad + ",".join(fmt_scalar(x[c], "cell", s) for c, s in zip(cols, smode)))
+            self.line(lines, pad + ",".join(self.scalar(x[c], "cell", s) for c, s in zip(cols, smode)))
         return lines
 
-    def outline(self, key, arr, d, keep_order=False):
-        spec = _plan(arr, keep_order)
-        if spec is None:
-            return None
-        lines = [f"{' ' * d}{key}[{len(arr)}]{spec.header()}"]
-        _render(arr, spec, d, lines)
-        return lines
+    def outlines(self, key, arr, d, keep_order=False):
+        out = []
+        for spec in _plans(arr, keep_order):
+            lines = [f"{' ' * d}{key}[{len(arr)}]{spec.header(key)}"]
+            self.render(arr, spec, d, lines)
+            out.append(lines)
+        return out
+
+    def cell(self, v, ctx, strmode):
+        if isinstance(v, list):
+            return "[" + ",".join(fmt_scalar(y, "list", strmode) for y in v) + "]"
+        if v == {}:
+            return "{}"
+        return self.scalar(v, ctx, strmode)
+
+    def render(self, arr, spec, depth, lines):
+        last = spec.order[-1]
+        for x in arr:
+            flat = dict(_flat_node(x, spec.child))
+            parts = []
+            for p in spec.order[:-1]:
+                if p not in spec.keyed:
+                    parts.append(self.cell(flat[p], "pos", spec.smode[p]) if p in flat else "-")
+            for p in spec.order[:-1]:
+                if p in spec.keyed and p in flat:
+                    parts.append(f"{_fmt_path(p)}={self.cell(flat[p], 'pos', spec.smode[p])}")
+            kids = x.get(spec.child) if spec.child is not None else None
+            if spec.child is not None and spec.child in x and not kids:
+                parts.append(f"{fmt_seg(spec.child)}=[]")
+            parts.append(self.cell(flat[last], "last", spec.smode[last]))
+            self.line(lines, " " * depth + " ".join(parts))
+            if kids:
+                self.render(kids, spec.sub or spec, depth + 1, lines)
 
     def items(self, key, arr, d):
         pad = " " * d
         lines = [f"{pad}{key}[{len(arr)}]"]
         for x in arr:
-            inl = fmt_inline(x, "item")
+            inl = self.inline(x, "item")
             if inl is not None:
-                lines.append(f"{pad}- {inl}")
+                self.line(lines, f"{pad}- {inl}")
                 continue
             if isinstance(x, dict):
                 sub: list[str] = []
@@ -223,13 +380,18 @@ class _Spec:
         self.order, self.required, self.keyed = order, required, keyed
         self.smode, self.child, self.sub = smode, child, sub
 
-    def header(self) -> str:
+    def header(self, key: str) -> str:
+        """`{cols}>child...`; `key` is the (formatted) key the rows are stored under."""
         cols = " ".join(
             _fmt_path(p) + ("?=" if p in self.keyed else "" if p in self.required else "?")
             + (":str" if self.smode[p] else "") for p in self.order)
         out = "{" + cols + "}"
         if self.child is not None:
-            out += ">" + fmt_seg(self.child) + (self.sub.header() if self.sub else "")
+            child = fmt_seg(self.child)
+            # bpp4: a bare `>` means the children are stored under the same key
+            out += ">" + ("" if child == key else child)
+            if self.sub:
+                out += self.sub.header(child)
         return out
 
 
@@ -264,8 +426,16 @@ def _is_rows(v) -> bool:
 
 
 def _plan(arr, keep_order):
+    specs = _plans(arr, keep_order)
+    return specs[0] if specs else None
+
+
+def _plans(arr, keep_order):
+    """Lossless row-table specs for arr, best guess first: for the first usable child
+    key, a tree (same columns on every level) and a child table (the top level gets
+    its own columns, e.g. a positional column that is only frequent there)."""
     if not arr or not all(isinstance(x, dict) and x for x in arr):
-        return None
+        return []
     seen = set()
     for ck in list(CHILD_KEYS) + [k for x in arr for k in x]:
         if ck in seen:
@@ -273,17 +443,18 @@ def _plan(arr, keep_order):
         seen.add(ck)
         if not any(x.get(ck) for x in arr) or not all(ck not in x or _is_rows(x[ck]) for x in arr):
             continue
+        specs = []
         nodes = _tree_nodes(arr, ck)
         if nodes is not None:
-            spec = _plan_cols(arr, nodes, ck, None, keep_order)
-            if spec is not None:
-                return spec
+            specs.append(_plan_cols(arr, nodes, ck, None, keep_order))
         sub = _plan([y for x in arr for y in x.get(ck) or []], keep_order)
         if sub is not None:
-            spec = _plan_cols(arr, arr, ck, sub, keep_order)
-            if spec is not None:
-                return spec
-    return _plan_cols(arr, arr, None, None, keep_order)
+            specs.append(_plan_cols(arr, arr, ck, sub, keep_order))
+        specs = [sp for sp in specs if sp is not None]
+        if specs:
+            return specs
+    spec = _plan_cols(arr, arr, None, None, keep_order)
+    return [spec] if spec is not None else []
 
 
 def _plan_cols(arr, nodes, child, sub, keep_order):
@@ -357,32 +528,3 @@ def _ordered_eq(a, b) -> bool:
     if isinstance(a, list):
         return isinstance(b, list) and len(a) == len(b) and all(map(_ordered_eq, a, b))
     return a is b or a == b
-
-
-def _cell(v, ctx, strmode):
-    if isinstance(v, list):
-        return "[" + ",".join(fmt_scalar(y, "list", strmode) for y in v) + "]"
-    if v == {}:
-        return "{}"
-    return fmt_scalar(v, ctx, strmode)
-
-
-def _render(arr, spec, depth, lines):
-    last = spec.order[-1]
-    for x in arr:
-        flat = dict(_flat_node(x, spec.child))
-        parts = []
-        for p in spec.order[:-1]:
-            if p not in spec.keyed:
-                parts.append(_cell(flat[p], "pos", spec.smode[p]) if p in flat else "-")
-        for p in spec.order[:-1]:
-            if p in spec.keyed and p in flat:
-                parts.append(f"{_fmt_path(p)}={_cell(flat[p], 'pos', spec.smode[p])}")
-        kids = x.get(spec.child) if spec.child is not None else None
-        if spec.child is not None and spec.child in x and not kids:
-            parts.append(f"{fmt_seg(spec.child)}=[]")
-        parts.append(_cell(flat[last], "last", spec.smode[last]))
-        lines.append(" " * depth + " ".join(parts))
-        if kids:
-            _render(kids, spec.sub or spec, depth + 1, lines)
-

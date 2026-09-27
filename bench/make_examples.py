@@ -14,6 +14,7 @@ sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(ROOT / "bench"))
 
 import datasets as ds  # noqa: E402
+from bpp.encoder import encode_md  # noqa: E402
 from bpp.formats import detect, dump_csv, dump_yaml, dumps, loads  # noqa: E402
 
 EX = ROOT / "examples"
@@ -27,6 +28,8 @@ EXAMPLES = {
     "orders": ("orders.json", "Karışık yapı: API yanıtı, 20 sipariş, iç içe nesneler ve serbest metin"),
     "logs": ("logs.json", "Tekrarlanan uzun değerler: 80 log kaydı"),
 }
+
+HAND_WRITTEN = ("quickstart.json", "siparisler.json")  # inputs kept as they are
 
 
 def write_inputs():
@@ -50,8 +53,12 @@ def main():
     write_inputs()
     for name, (fname, _) in EXAMPLES.items():
         data, fmt = load(name)
-        (EX / (Path(fname).stem + ".bpp")).write_text(
-            dumps(data, "bpp", keep_order=fmt == "csv"), encoding="utf-8")
+        text = (encode_md((EX / fname).read_text(encoding="utf-8")) if fmt == "md"
+                else dumps(data, "bpp", keep_order=fmt == "csv"))
+        (EX / (Path(fname).stem + ".bpp")).write_text(text, encoding="utf-8")
+    for fname in HAND_WRITTEN:  # the READMEs' quick-start samples
+        data = loads((EX / fname).read_text(encoding="utf-8"), detect(fname))
+        (EX / (Path(fname).stem + ".bpp")).write_text(dumps(data, "bpp"), encoding="utf-8")
     print("wrote", ", ".join(sorted(p.name for p in EX.iterdir())))
 
 

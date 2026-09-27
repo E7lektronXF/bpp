@@ -4,17 +4,19 @@
     text = bpp.dumps({"users": [{"id": 1, "name": "Ayşe"}]})   # -> .bpp text
     data = bpp.loads(text)                                      # -> Python objects
     data = bpp.load("config.yaml")          # any supported file (.json .yaml .csv .md .bpp)
+    text = bpp.encode_md(markdown_text)     # Markdown -> .bpp (keeps the source if that is shorter)
     bpp.dump(data, "config.bpp")            # format from the extension
 """
 
 from pathlib import Path
 
-from .decoder import decode
-from .encoder import encode
+from .decoder import decode, md_source
+from .encoder import encode, encode_md
 from .lexer import BppError
 
-__version__ = "0.3.0"
-__all__ = ["encode", "decode", "dumps", "loads", "load", "dump", "BppError", "__version__"]
+__version__ = "0.4.0"
+__all__ = ["encode", "encode_md", "decode", "md_source", "dumps", "loads", "load", "dump",
+           "BppError", "__version__"]
 
 dumps = encode
 loads = decode

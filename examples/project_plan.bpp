@@ -1,47 +1,47 @@
-bpp3
+bpp4
 title Veri platformu göçü — 2026 H2
-note "Eski Hadoop kümesinden bulut tabanlı lakehouse mimarisine geçiş planı. Sahibi: Veri Platformu ekibi.\nHedef tarih: 15 Aralık 2026. Bütçe: 420.000 €."
-steps[5]{status? note?= title}>steps
-- Keşif ve envanter
- done note="Toplam 312 Airflow DAG'i, 48 Spark işi ve 17 Hive veritabanı tespit edildi." Mevcut iş akışlarının envanteri
+note Eski Hadoop kümesinden bulut tabanlı lakehouse mimarisine geçiş planı. Sahibi: Veri Platformu ekibi. Hedef tarih: 15 Aralık 2026. Bütçe: 420.000 €.
+steps[5]{title}>{status? note?= title}>
+Keşif ve envanter
+ done Mevcut iş akışlarının envanteri Toplam 312 Airflow DAG'i, 48 Spark işi ve 17 Hive veritabanı tespit edildi.
  done Veri sahipleriyle görüşmeler
   done Pazarlama analitiği
   done Finans raporlama
   done Ürün analitiği
-  todo note="KVKK kapsamındaki tablolar için ayrı onay gerekiyor." Hukuk ve uyum
- done note="Mevcut küme aylık 38.000 €; hedef mimari tahmini aylık 21.500 €." Maliyet modeli
- doing note="DAG'ler arası bağımlılıkların %70'i otomatik çıkarıldı, kalanı elle." Bağımlılık grafiğinin çıkarılması
-- Mimari
- done note="Iceberg seçildi: çoklu motor desteği ve gizli bölümleme." Depolama formatı seçimi (Iceberg vs Delta)
+  todo Hukuk ve uyum KVKK kapsamındaki tablolar için ayrı onay gerekiyor.
+ done Maliyet modeli Mevcut küme aylık 38.000 €; hedef mimari tahmini aylık 21.500 €.
+ doing Bağımlılık grafiğinin çıkarılması DAG'ler arası bağımlılıkların %70'i otomatik çıkarıldı, kalanı elle.
+Mimari
+ done Depolama formatı seçimi (Iceberg vs Delta) Iceberg seçildi: çoklu motor desteği ve gizli bölümleme.
  done Katalog: AWS Glue yerine Nessie
  doing Ağ ve güvenlik tasarımı
   done VPC ve özel uç noktalar
   doing IAM rol modeli
   todo Şifreleme anahtarlarının rotasyonu
- todo note="RPO 1 saat, RTO 4 saat. Bölgeler arası kopya: eu-central-1 → eu-west-1." Felaket kurtarma planı
-- Göç dalgaları
+ todo Felaket kurtarma planı RPO 1 saat, RTO 4 saat. Bölgeler arası kopya: eu-central-1 → eu-west-1.
+Göç dalgaları
  - Dalga 1 — düşük riskli tablolar
   done 120 boyut tablosunun kopyalanması
   done note="```sql\nSELECT count(*), sum(hash(*)) FROM eski.tablo\nEXCEPT\nSELECT count(*), sum(hash(*)) FROM yeni.tablo;\n```" Doğrulama betikleri
   done Okuyucuların yeni kataloğa yönlendirilmesi
  - Dalga 2 — olay tabloları
-  doing note="Bölümleme: gün + ülke kodu. Tahmini süre 3 hafta." Günlük olay tablolarının yeniden bölümlenmesi
+  doing Günlük olay tablolarının yeniden bölümlenmesi Bölümleme: gün + ülke kodu. Tahmini süre 3 hafta.
   todo Geçmiş verinin (2019–2023) arşiv katmanına taşınması
   todo Akış işlerinin (Kafka → Iceberg) devreye alınması
    todo Şema kayıt defteri entegrasyonu
    todo Tam olarak bir kez (exactly-once) yazım testi
  - Dalga 3 — finans ve uyum
-  todo note="Ay sonu kapanışı sırasında göç yapılmayacak (her ayın son 3 iş günü)." Finans tablolarının göçü
+  todo Finans tablolarının göçü Ay sonu kapanışı sırasında göç yapılmayacak (her ayın son 3 iş günü).
   todo Hukuk onayı
-  cancelled note="İptal: sunucu Ocak'ta tamamen kapatılacak." Eski raporlama sunucusunun taşınması
-- Doğrulama ve performans
+  cancelled Eski raporlama sunucusunun taşınması İptal: sunucu Ocak'ta tamamen kapatılacak.
+Doğrulama ve performans
  todo Sorgu performansı karşılaştırması (en yoğun 50 sorgu)
  todo Maliyet izleme panoları
  todo Veri kalitesi kuralları (Great Expectations)
   todo Boş değer oranları
   todo Benzersizlik kısıtları
   todo Referans bütünlüğü
-- Kapanış
+Kapanış
  todo Eski kümenin salt okunur moda alınması
  todo Eski kümenin kapatılması
  todo Ekip eğitimi ve dokümantasyon

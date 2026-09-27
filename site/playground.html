@@ -277,11 +277,16 @@ function render() {
     return;
   }
   els.output.classList.remove('error');
-  const out = encode(model, { primer: $('opt-primer').checked, refs: $('opt-refs').checked, keepOrder });
+  const opts = { primer: $('opt-primer').checked, refs: $('opt-refs').checked, keepOrder };
+  // Markdown keeps its source text (`bpp4 md`) when that is shorter than the tree.
+  const out = state.fmt === 'md' ? encodeMD(text, opts) : encode(model, opts);
   els.output.textContent = out;
 
   let same = false;
-  try { same = canon(decode(out), keepOrder) === canon(model, keepOrder); } catch { same = false; }
+  try {
+    same = canon(decode(out), keepOrder) === canon(model, keepOrder) &&
+      (!out.startsWith(MD_HEADER + '\n') || mdSource(out) === text);
+  } catch { same = false; }
   els.rt.hidden = false;
   els.rt.className = 'status ' + (same ? 'ok' : 'bad');
   els.rt.textContent = same ? 'Decodes back identically' : 'Round trip mismatch';

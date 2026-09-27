@@ -1,6 +1,6 @@
-# .bpp — Format Spesifikasyonu (sürüm `bpp3`)
+# .bpp — Format Spesifikasyonu (sürüm `bpp4`)
 
-> Durum: **v3** (`bpp3`; decoder `bpp1` ve `bpp2` dosyalarını da okur, bkz. §11). Her karar `bench/experiments.py` ile ölçüldü; ham sonuçlar
+> Durum: **v4** (`bpp4`; decoder `bpp1`, `bpp2` ve `bpp3` dosyalarını da okur, bkz. §11). Her karar `bench/experiments.py` ile ölçüldü; ham sonuçlar
 > `bench/results/experiments.md`'de. Benchmark sonuçları ve revizyon önerileri (R1–R5):
 > [BENCHMARK.tr.md](BENCHMARK.tr.md) §5.
 > English: [SPEC.md](SPEC.md)
@@ -31,7 +31,7 @@ daha fazla eksik saydığını belirtir); **formatlar arası göreli fark** esas
 ## 1. Dosya yapısı
 
 ```
-bpp3                      ← başlık satırı (zorunlu, sürüm)
+bpp4                      ← başlık satırı (zorunlu, sürüm)
 # ...                     ← 0+ yorum/primer satırı (opsiyonel)
 &0 uzun tekrarlanan değer ← 0+ sözlük tanımı (opsiyonel)
 ...gövde...               ← kök değer
@@ -42,6 +42,9 @@ bpp3                      ← başlık satırı (zorunlu, sürüm)
 * `#` ile başlayan satır (girintiden sonra) yorumdur; decoder yok sayar. Anahtar `#` ile
   başlıyorsa tırnaklanır.
 * Boş satırlar yok sayılır.
+* Bu iki kural `|N` blok string'lerinin (§2.2) içinde geçerli değildir: blok satırları olduğu gibi
+  alınır.
+* Başlığı `bpp4 md` olan dosya, bir Markdown belgesini kaynak metin olarak taşır (§7.2).
 
 **Ölçüm (E2, iç içe config):** 1 boşluk girinti 2 boşluğa göre o200k'de −%6.4, claude2'de ±0;
 tab girinti claude2'de +%12 kötü.
@@ -56,6 +59,7 @@ tab girinti claude2'de +%12 kötü.
 | özel sayı | `NaN`, `Infinity`, `-Infinity` | yalnızca YAML girdisi için |
 | string (çıplak) | `Ahmet Yılmaz` | bağlama göre satır sonuna/ayraca kadar |
 | string (tırnaklı) | `"satır1\nsatır2"` | JSON string sözdizimi ve escape'leri |
+| string (blok) | `\|2` + 2 ham satır | çok satırlı metin, bpp4 (bkz. §2.2) |
 | referans | `*3` | sözlükteki `&3` tanımının değeri (bkz. §6) |
 
 ### 2.1 Tırnaklama kuralı (minimum tırnak)
@@ -65,7 +69,9 @@ Bir string **çıplak** yazılır; aşağıdakilerden biri doğruysa JSON string
 * boş string;
 * baş veya sondaki boşluk;
 * herhangi bir kontrol karakteri (`\n`, `\r`, `\t`, U+0000–U+001F, U+007F);
-* `"`, `[`, `{`, `*`, `&`, `#` ile başlıyor;
+* `"`, `[`, `{`, `&`, `#` ile başlıyor;
+* `*` ya da `|` ve ardından yalnızca rakamlardan oluşuyor (`*12`, `|3`): referans ya da blok
+  işareti;
 * `null`, `true`, `false`, `NaN`, `Infinity`, `-Infinity` ile birebir aynı;
 * JSON sayı gramerine uyuyor (`"42"`, `"1.1"`, `"-0"`);
 * bağlamın ayracını içeriyor (tabloda `,`, satır tablosunda boşluk, satır içi listede `,` ve `]`);
@@ -78,6 +84,55 @@ kendisidir (escape yoktur).
 
 **Ölçüm (E7, Türkçe metin):** `\u` escape'li JSON ham UTF-8'e göre o200k'de +%161, claude2'de
 +%124 token. Her şeyi tırnaklamak tabloda +%1.3 / +%2.4 (E1).
+
+**Ölçüm (E13, bpp4):** bpp1–bpp3 `*` ile başlayan her string'i tırnaklıyordu; bu, Markdown'daki
+kalın yazıya (`**Not:** …`) da denk geliyordu. Yalnızca `*` + rakamları tırnaklamak §7.1'deki beş
+Markdown belgesinde 16 / 8 token kazandırıyor (o200k / claude2).
+
+### 2.2 Blok string'ler: `|N` (bpp4)
+
+Bir string değerin yerine yazılan `|N`: **bu satırdan sonraki N ham satır string'in kendisidir.**
+
+```
+note |3
+Birinci paragraf, `kod` ve "tırnak" içerir.
+
+İkinci paragraf: \ ve \n olduğu gibi kalır.
+```
+
+* N satır `\n` ile birleştirilir. İçlerinde hiçbir şey escape edilmez, tırnaklanmaz ya da
+  girintilenmez; decoder bu satırları bpp olarak okumaz: blok satırı boş olabilir, boşlukla, `#`,
+  `|`, `- ` ile başlayabilir ya da `bpp3` başlığına benzeyebilir. Bloğu, tablolardaki `[N]` gibi,
+  satır sayısı sınırlar.
+* `|N` her string değerin yerine geçebilir: `key |N`, `- |N` liste öğesi, `&0 |N` sözlük tanımı ve
+  tüm tablo hücreleri (virgüllü hücreler, pozisyonel hücreler, anahtarlı `note=|N` ve son sütun).
+  Satır içi listede (`[...]`) blok değildir: `[|3]` `"|3"` string'idir.
+* Bir satırda birden fazla blok varsa soldan sağa sırayla gelir: `|2 |1 Başlık` satırından sonra
+  önce birinci bloğun 2 satırı, sonra ikincinin 1 satırı gelir.
+* Satır tablosunda blok satırları kendi satırının hemen ardından, girintili çocuk satırlardan önce
+  gelir.
+* `\n` ile biten string'in son satırı boştur. `|3` string'inin kendisi tırnaklanır (§2.1); blok
+  işaretine benzeyen anahtarlar da öyle.
+* Encoder bloğu yalnızca `\n` içeren ve başka kontrol karakteri içermeyen (`\r` yok, `\t` yok)
+  string'ler için ve tahmini kazanç negatif değilse kullanır (eşitlikte blok seçilir; okuması da
+  daha kolaydır):
+
+  `kazanç = t(" " + "json string") + m − t(" |N") − t(string + "\n")`
+
+  t §6'daki tahminci, m ise ASCII noktalama işaretinden ya da başka bir satır sonundan sonra
+  gelen satır sonlarının sayısıdır: ham satır sonu önündeki token'a kaynaşır (`):\n\n` tek
+  token), escape edilmiş `\n` kaynaşmaz ve tahminci tek başına bunu kaçırır.
+
+**Ölçüm (E10, §7.1'deki beş Markdown belgesi, dosyanın tamamı):**
+
+| çok satırlı string'ler | o200k | claude2 |
+|---|---:|---:|
+| hepsi tırnaklı (bpp3) | 15201 | 15749 |
+| hepsi blok | 14824 | 15508 |
+| **kazanç ≥ 0 ise blok** | **14824** | **15513** |
+
+Bu belgelerde her çok satırlı string'i blok yazmak kuraldan en fazla 5 token farklı; kural ise
+`"a\nb"` gibi kısa string'leri, bloğun daha pahalı olduğu yerde, tırnaklı bırakır.
 
 ## 3. Nesneler: `key value`
 
@@ -94,8 +149,8 @@ service
 * `anahtar␠değer` — anahtar ile skaler arasında **tek boşluk**.
 * Tek başına `anahtar` satırı iç içe nesne açar; çocukları bir seviye derindedir. Çocuksuz
   çıplak anahtar geçersizdir: boş nesne `{}`, boş dizi `[]` yazılır.
-* Anahtar çıplak yazılır eğer: boş değilse, boşluk/kontrol karakteri, `"[]{}=,:?>` içermiyorsa
-  ve `-#&*` ile başlamıyorsa. Aksi halde JSON string olarak tırnaklanır (`"first name" Ali`).
+* Anahtar çıplak yazılır eğer: boş değilse, boşluk/kontrol karakteri, `"[]{}=,:?>` içermiyorsa,
+  `-#&*` ile başlamıyorsa ve blok işareti (`|3`) değilse. Aksi halde JSON string olarak tırnaklanır (`"first name" Ali`).
   Unicode harfli anahtarlar (`şehir`) çıplak yazılır.
 * Anahtar sırası korunur.
 
@@ -160,7 +215,7 @@ Başlıktaki sütun adları **boşlukla** ayrılmışsa satırlar boşlukla ayr�
 ağaçlar için tasarlandı; ölçümler düz tablolarda da en ucuz form olduğunu gösterdi (§4.2 notu):
 
 ```
-steps[2]{id:str status? priority deps:str owner?= note?= title}>steps
+steps[2]{id:str status? priority deps:str owner?= note?= title}>
 1 done P1 [] owner=Ayşe Gereksinim analizi
  1.1 done P1 [] Paydaş görüşmeleri
  1.2 - P0 [1.1] Regülasyon incelemesi (BDDK, PCI-DSS)
@@ -185,6 +240,11 @@ steps[2]{id:str status? priority deps:str owner?= note?= title}>steps
 * `>child`: özyineleme anahtarı. Bir satırın hemen altındaki **bir boşluk daha girintili**
   satırlar o öğenin `child` dizisidir. Çocuk dizisi boşsa `child=[]` yazılır; anahtar yoksa hiçbir
   şey yazılmaz. `[N]` yalnızca en üst seviyedeki satırları sayar.
+* Tek başına `>` (bpp4), çocuk anahtarının tablonun kendi anahtarı olduğunu söyler:
+  `steps[2]{...}>` = `steps[2]{...}>steps`. Alt şemada (`orders[2]{...}>items{...}>`) o alt anahtarı
+  tekrarlar. Anahtarsız tablonun (`[N]{...}`) tekrarlanacak anahtarı yoktur; orada ad hep yazılır.
+  **Ölçüm (E12):** §7.1'deki beş Markdown belgesinde −16 / −8 token, `plan.json`'da −2 / −1
+  (636 → 634, 728 → 727).
 * Son sütunun değeri `ad=` kalıbıyla başlıyorsa tırnaklanır.
 * Başlık sırası = satırdaki değer sırası = decode edilen nesnedeki anahtar sırası. (LLM'in
   sütunları doğru eşlemesi için başlık ile satır sırası asla ayrışmaz.)
@@ -237,11 +297,16 @@ A-2 Wilmslow sent Alan Turing
   satırın altında bir boşluk girintiyle yazılır; alt tabloların da kendi alt tabloları olabilir
   (`>parts{...}>subs{...}`). Boş alt liste eskisi gibi `child=[]`.
 
-Encoder önce ağacı (aynı sütunlar), sonra alt tabloyu, sonra alt tablosuz halini dener ve kayıpsız
-olan ilk düzeni alır; ardından olağan maliyet karşılaştırması (§4.2) bu satır tablosu, virgüllü
-tablo ve `- ` öğeleri arasında seçim yapar. Anahtar sırası başlık sırasıyla yeniden kurulur;
-`keep_order` açıkken encoder yalnızca yeniden kurulan nesnelerin anahtar sırası orijinalle birebir
-aynı olan düzeni kullanır.
+Kullanılabilen ilk çocuk anahtarı için encoder hem ağacı (aynı sütunlar) hem alt tabloyu (üst
+seviyeye kendi sütunları) kurar; çocuk anahtarı yoksa düz satır tablosunu. Ardından olağan maliyet
+karşılaştırması (§4.2) bunlar, virgüllü tablo ve `- ` öğeleri arasında seçim yapar. Anahtar sırası
+başlık sırasıyla yeniden kurulur; `keep_order` açıkken encoder yalnızca yeniden kurulan nesnelerin
+anahtar sırası orijinalle birebir aynı olan düzeni kullanır.
+
+bpp3 kayıpsız olduğu sürece hep ağacı seçiyordu. bpp4'te alt tablo da yarışır; bu Markdown
+ağaçlarında önemlidir: başlıklar (üst seviye) çoğu zaman uzun bir not taşır, liste maddeleri
+nadiren. Alt tabloda başlığın notu pozisyonel olabilir (`|7 Başlık`, yoksa `-`), alt seviyelerde
+anahtarlı kalır (`note=|7`). **Ölçüm (E14, §7.1'deki beş Markdown belgesi):** −14 / −12 token.
 
 **Ölçüm (`examples/orders.json`, her biri müşteri nesnesi ve 1–3 kalem içeren 20 sipariş):**
 
@@ -281,7 +346,8 @@ mixed[3]
 ### 4.5 Kök değer
 
 Kök nesne ise girdileri 0 girintide yazılır. Kök dizi anahtarsız başlıkla yazılır
-(`[60]{id,name}`, `[3]`, `[1,2,3]`). Kök skaler tek satırdır; kök string her zaman tırnaklanır.
+(`[60]{id,name}`, `[3]`, `[1,2,3]`). Kök skaler tek satırdır; kök string, blok olarak yazılmadıkça (`|N` ve satırları, §2.2) her
+zaman tırnaklanır.
 
 ## 5. Ayrıştırma belirsizlikleri ve çözümleri
 
@@ -291,27 +357,33 @@ Kök nesne ise girdileri 0 girintide yazılır. Kök dizi anahtarsız başlıkla
 | `- hello` (boşluksuz, çocuksuz) | String `"hello"`. |
 | `key` tek başına ve çocuksuz | Geçersiz; boş nesne `key {}`. |
 | `42` string mi sayı mı? | Sayı; string `"42"` ya da `:str` sütun. |
-| Değer `*` veya `&` ile başlıyor | Tırnaklanır; çıplak `*n` referanstır. |
+| Değer `*` veya `&` ile başlıyor | `&` ile başlayan tırnaklanır. `*` + rakamlar referanstır (string `"*3"` tırnaklanır); `*not*`, `**kalın**` string'dir. |
+| `\|3` string mi, blok mu? | 3 satırlık blok (bpp4). String `"\|3"` diye yazılır; `[...]` içinde string'dir. |
+| `- \|2` ve ardından 2 satır | Blok string öğesi. `\|2` anahtarı tırnaklanır, dolayısıyla nesne olamaz. |
 
 ## 6. Sözlük / referanslar: `&n` ve `*n`
 
 YAML anchor/alias gösterimi (LLM'in tanıdığı kalıp):
 
 ```
-bpp3
+bpp4
 &0 Connection to upstream payment provider timed out after 30000ms
 &1 payments-gateway-eu-west-1
 logs[80]{ts,level,service,message,latency_ms}
 2026-09-24T10:00:00Z,ERROR,*1,*0,30000
 ```
 
-* Tanımlar başlık/yorumlardan sonra, gövdeden önce gelir: `&n değer` (değer §2 skaleri).
+* Tanımlar başlık/yorumlardan sonra, gövdeden önce gelir: `&n değer` (değer §2 skaleri; çok
+  satırlı değer blok olabilir: `&0 |3`).
 * `*n` herhangi bir **string değer** konumunda kullanılabilir (girdi değeri, hücre, liste öğesi,
   `ad=` değeri). Anahtarlarda kullanılmaz.
 * **Kullanım kuralı:** encoder bir string'i ancak
   `n·t(değer) − (t(tanım satırı) + n·t(*i)) > 0` ise sözlüğe alır (t = deterministik token
   tahmincisi; ortamdan bağımsız aynı çıktı için tiktoken kullanılmaz). Aday: ≥2 kez geçen ve
-  ≥8 karakterlik string'ler; kazanç sırasına göre numaralandırılır.
+  ≥8 karakterlik string'ler; kazanç sırasına göre numaralandırılır. bpp4'te tahminci ardışık satır
+  sonlarını (boş satır) tek token sayar, `?=`, `=|` ve `"=` çiftlerini ise iki token; iki tokenizer
+  da böyle yapıyor (E14: Markdown belgelerinde −3 / −1 token; hiçbir JSON, YAML, CSV örneği
+  değişmedi).
 
 **Ölçüm (E3, 80 log satırı):** mesajlar+servisler sözlükte: −%39.0 / −%40.1. Kısa değerler
 (departman/şehir, 1–2 token) için kazanç yok (−%0.1 / −%1.7) → eşik kuralı bunu eler.
@@ -325,50 +397,149 @@ uyarsa aynı şekilde kodlanır):
 ```
 title <plan başlığı>
 goal <opsiyonel açıklama>
-steps[N]{id:str status priority deps:str owner?= due?= note?= title}>steps
+steps[N]{id:str status priority deps:str owner?= due?= note?= title}>
 ```
 
 * `id`: hiyerarşik kimlik (`1`, `1.2`, `1.2.3`); `:str` sayesinde tırnaksız.
 * `status`: `todo | doing | done | blocked | cancelled`.
 * `priority`: `P0 | P1 | P2 | P3`.
 * `deps`: bağımlı olunan adım kimlikleri, satır içi liste (`[1.1,2]`).
-* Alt adımlar `>steps` ile girintili satırlardır.
+* Alt adımlar `>` (`>steps`) ile girintili satırlardır.
 
 Markdown girişinde: başlıklar (`#`, `##`, …) ve iç içe listeler ağaca çevrilir; `- [ ]` →
 `status todo`, `- [x]` → `status done`, `[/]` → `doing`, `[-]` → `cancelled`. Checkbox'sız
-başlık ve maddelerde `status` yoktur; satırda `-` görünür:
+başlık ve maddelerde `status` yoktur; satırda `-` görünür. Burada başlıkların kendi sütunları var
+(alt tablo, §4.3.1):
 
 ```
-steps[5]{status? note?= title}>steps
-- Keşif ve envanter
- done note="Toplam 312 Airflow DAG'i ..." Mevcut iş akışlarının envanteri
- doing Bağımlılık grafiğinin çıkarılması
+steps[5]{title}>{status? note?= title}>
+Keşif ve envanter
+ done Mevcut iş akışlarının envanteri Toplam 312 Airflow DAG'i, 48 Spark işi ve 17 Hive veritabanı tespit edildi.
+ done Veri sahipleriyle görüşmeler
+  done Pazarlama analitiği
 ```
+
+### 7.1 Yumuşak satır sonları (bpp4)
+
+Markdown'da yapı korunur, biçim korunmaz (§9); yumuşak satır sonu da biçimdir: CommonMark onu
+boşluk olarak gösterir. bpp4 şunları bir boşlukla birleştirir:
+
+* bir liste maddesinin ilk paragrafının kaydırılmış satırlarını, maddenin altına girintili ya da
+  "lazy" (girintisiz) olsun, `title`'a. bpp4'ten önce bunlar `note`'a gidiyordu; başlık son sütun
+  olduğu için cümlenin ikinci yarısı ilk yarısından önce yazılıyordu
+  (`note=virtualenv. Check https://… in a clean`);
+* `note` içindeki düz paragrafların kaydırılmış satırlarını.
+
+Hard break (satır sonunda iki boşluk ya da `\`) veya boş satırın ötesine birleştirme yapılmaz;
+kendi bloğunu başlatan ya da başlatabilecek satırlar da hiç birleştirilmez: code fence
+(```` ``` ````, `~~~`), `$$` matematik, blockquote (`>`), HTML (`<`, bitiş işaretine ya da boş satıra
+kadar), tablo satırları (`|` içeren her satır), liste işaretleri, `#`, yatay çizgi ve setext alt
+çizgileri (`---`, `===`, `***`), bağlantı tanımları (`[x]: …`) ve YAML front matter. Hard break'ten
+sonraki satır maddenin `note`'unu başlatır; yani maddesinin altına not yazmak isteyen bir checklist
+hard break ya da boş satır kullanır, düz girintili satır ise (işlenmiş Markdown'da olduğu gibi)
+başlığı sürdürür. `tree_to_md` maddenin başlığı ile notu arasına boş satır koyar, böylece
+md → tree → md → tree sabit kalır. `md_to_tree(text, join=False)` her satır sonunu korur (bpp3
+davranışı).
+
+**Ölçüm (E11):** bpp4 Markdown deneylerinin derlemi `bench/corpus/`: bu deponun v0.3.0'daki
+README, SPEC, BENCHMARK ve RELEASING dosyaları ile `examples/project_plan.md`.
+
+| satır sonları | o200k | claude2 |
+|---|---:|---:|
+| hepsi korunur (bpp3) | 15059 | 15737 |
+| madde başlıkları birleşir | 14915 | 15627 |
+| **madde başlıkları ve not paragrafları birleşir** | **14824** | **15513** |
+
+### 7.2 Kaynağıyla saklanan Markdown: `bpp4 md` (bpp4)
+
+Bir Markdown belgesi kendi kaynak metni olarak da yazılabilir:
+
+```
+bpp4 md
+# Releasing to PyPI
+
+The package is published as ...
+```
+
+* `bpp4 md` başlık satırı (öncesinde isteğe bağlı boş ya da `#` satırları olabilir) şu anlama
+  gelir: o satırın `\n`'inden sonraki her şey, dosyanın sonuna kadar, bayt bayt Markdown
+  kaynağıdır. Başlıktan sonra sayı, escape ya da bpp sözdizimi yoktur.
+* Decode sonucu `md_to_tree(kaynak)`'tır (`bpp decode`, `--to json`, `bpp.decode`); `--to md` ise
+  kaynağı değiştirmeden geri verir (`bpp.md_source`). YAML ve CSV çıktısı ağacı kullanır.
+* `encode_md` (`bpp encode x.md`, `bpp x.md` ve `bpp stats x.md` bunu kullanır) hem ağaç kodlamasını
+  hem bu biçimi kurar ve tahmincinin daha kısa saydığını seçer; eşitlikte ağaç kalır. Bu biçim
+  kaynaktan tam olarak başlık satırı kadar uzundur (o200k ve claude2'de 5 token); yani tahminciye
+  göre bir Markdown dosyası bundan fazla büyümez. Beş belgede gerçek tokenizer'lar her seçimle
+  aynı fikirde (E15).
+* Bu biçime primer eklenmez: içinde bpp sözdizimi yoktur.
+
+**Ölçüm (E15):**
+
+| | o200k | claude2 |
+|---|---:|---:|
+| Markdown kaynağı | 15072 | 15844 |
+| `bpp4 md` + kaynak | 15097 | 15869 |
+| **bpp4, `encode_md`** | **14824** | **15513** |
+| bpp4 + primer, `encode_md` | 15010 | 15757 |
+
+Belge başına (o200k / claude2): README 3703 / 3894, Markdown'da 3722 / 3938; SPEC 6144 / 6330'a
+karşı 6269 / 6483; BENCHMARK 3724 / 3756'ya karşı 3747 / 3802; RELEASING 495 / 537'ye karşı
+497 / 543; proje planı 758 / 996'ya karşı 837 / 1078. Primer'le README, BENCHMARK ve RELEASING
+kaynak olarak saklanır.
 
 ## 8. Primer (opsiyonel)
 
 Formatı hiç görmemiş bir LLM için dosyanın başına `#` yorum satırı olarak eklenebilir
 (`bpp encode --primer`). Decoder yok sayar.
 
-**1 satır (o200k 84 / claude2 88 token):**
+**1 satır.** bpp4'ten beri primer yalnızca çıktının kullandığı sözdizimini anlatır: satır
+tabloları (`b.c` yol örneği yalnızca yol sütunu varsa), virgüllü tablolar, `x?`, `x?=`, `>k` ya da
+tek başına `>`, `"..."`, `|N` ve `*n`. Tüm özelliklerle (108 / 114 token):
+
 ```
-# bpp3: JSON as 'key value' lines, 1-space indent nests. k[N]{a b.c}: N rows, values in column order (b.c = key c of b), last one = rest of line; x? optional (- = absent), x?= as x=v; >k: indented rows are k. "..." = JSON string, *n = &n.
+# bpp4: JSON as 'key value' lines, 1-space indent nests. k[N]{a b.c}: N rows, values in column order (b.c = key c of b), last one = rest of line; k[N]{a,b}: N comma rows; x? optional (- = absent); x?= as x=v; >k: indented rows are k (bare >: same key). "..." = JSON string, |N = the next N lines, *n = &n.
 ```
 
-**3 satır (136 / 146 token):**
+`examples/quickstart.json` için 40 / 42 token:
+
 ```
-# bpp3 = JSON data. Lines are 'key value'; a bare 'key' opens a nested object (1-space indent). [a,b] = list.
+# bpp4: JSON as 'key value' lines, 1-space indent nests. k[N]{a b}: N rows, values in column order, last one = rest of line.
+```
+
+**Markdown primer'ı.** `encode_md`, Markdown ağaçları için yazılmış ayrı bir primer kullanır.
+`examples/project_plan.md` için (64 / 65 token):
+
+```
+# bpp4 Markdown: steps[N]{cols} = N headings/list items, cols in order, title = rest of line, indented rows = sub-items (>{...}: own cols); status: todo/done/doing/cancelled (- none); note= its text. "..." = JSON string.
+```
+
+Bununla proje planı 822 / 1062 token tutuyor, Markdown kaynağından (837 / 1078) az; bpp3 primer'iyle
+876 / 1106 tutuyordu.
+
+**3 satır** (`--primer long`, sabit metin, 156 / 166 token; Markdown girdisinde `--primer long`
+Markdown primer'ını verir):
+```
+# bpp4 = JSON data. Lines are 'key value'; a bare 'key' opens a nested object (1-space indent). [a,b] = list.
 # k[N]{a b.c d}: N rows, values space-separated in column order, b.c = key c inside object b, last column = rest of line;
-# x? = optional, '-' if absent; x?= written as x=v; >kids: indented rows are kids, >kids{...} gives them their own columns. {a,b}: comma rows. k[N]: N '- ' items. "..." = JSON string. *n = &n value.
+# x? = optional, '-' if absent; x?= written as x=v; >kids: indented rows are kids (a bare > keeps the table's key), >kids{...} gives them their own columns. {a,b}: comma rows. k[N]: N '- ' items. "..." = JSON string. |N = the next N lines as a string. *n = &n value.
 ```
 
-> Aşama 4 revizyonu: Aşama 1'deki primer "k[N]{a,b} = N CSV rows" diyordu; Aşama 2'de satır
-> tablosu varsayılan olunca primer gerçek sözdizimini anlatacak şekilde yeniden yazıldı
-> (38 → 60 token). `bpp2` ile `x?` / `x?=` ayrımı eklendi (60 → 70 token); bpp3 yolları ve alt tabloları ekledi (70 → 84 token).
+**Ölçüm (E16):**
 
-Primer sabit maliyettir: 60 satırlık tabloda (~2050 token) %2–3, küçük bir config'te (~330 token)
-%12–35. Varsayılan **kapalı**; Aşama 4'te anlama testinin primer'li/primer'siz karşılaştırması
-yapılacak.
+| primer | o200k | claude2 |
+|---|---:|---:|
+| bpp3, 1 satır | 84 | 88 |
+| bpp4, `plan.json` | 64 | 66 |
+| bpp4, `examples/quickstart.json` | 40 | 42 |
+| bpp4, Markdown, `project_plan.md` | 64 | 65 |
+
+> Geçmiş: Aşama 1'deki primer "k[N]{a,b} = N CSV rows" diyordu; Aşama 2'de satır tablosu varsayılan
+> olunca primer gerçek sözdizimini anlatacak şekilde yeniden yazıldı (38 → 60 token). `bpp2` ile
+> `x?` / `x?=` ayrımı eklendi (60 → 70 token); bpp3 yolları ve alt tabloları ekledi (70 → 84 token);
+> bpp4'te yalnızca kullanılanı anlatır oldu.
+
+Primer sabit maliyettir. Varsayılan **kapalı**; anlama testi primer'li ve primer'siz cevapları
+karşılaştırır.
 
 ## 9. Kayıpsızlık tanımı
 
@@ -383,32 +554,46 @@ yapılacak.
   anahtarları string'e çevrilir.
 * CSV: hücre metni birebir korunur. Encoder bir hücreyi sayı/bool/null'a yalnızca metne geri
   yazıldığında aynı metni verecekse çevirir (`007` string kalır, `1.50` string kalır).
+* Markdown: ağaç yapıyı korur (başlıklar, maddeler, checkbox'lar, notlar), biçimi korumaz;
+  yumuşak satır sonları birleştirilir (§7.1). Ağaçtan yazılan normalize Markdown aynı ağaca geri
+  okunur. `bpp4 md` dosyası (§7.2) kaynak metni bayt bayt geri verir.
 
 ## 10. Gramer (özet, EBNF benzeri)
 
 ```
-file      = "bpp3" NL {comment} {def} body
+file      = "bpp4" NL {comment} {def} body
+          | "bpp4 md" NL {any}                             (* Markdown kaynağı, §7.2 *)
 comment   = INDENT "#" {any} NL
-def       = "&" digits SP scalar NL
-body      = object(0) | rootarray | scalar NL
+def       = "&" digits SP string NL [blocks]
+body      = object(0) | rootarray | scalar NL [blocks]
 object(d) = {entry(d)}
-entry(d)  = I(d) key SP inline NL                          (* skaler / [..] / {} / [] *)
+entry(d)  = I(d) key SP inline NL [blocks]                 (* skaler / [..] / {} / [] *)
           | I(d) key NL object(d+1)                        (* iç içe nesne *)
-          | I(d) key "[" N "]" "{" cols(",") "}" NL N×row(d, ",")
-          | I(d) key "[" N "]" spec NL rowtree(d, spec)
+          | I(d) key "[" N "]" "{" cols(",") "}" NL N×(row(d, ",") [blocks])
+          | I(d) key "[" N "]" spec NL rowtree(d, spec)     (* her satırın ardından blokları *)
           | I(d) key "[" N "]" NL N×item(d)
-item(d)   = I(d) "- " (inline | entry-tail) NL [object(d+1)]
-spec      = "{" cols(" ") "}" [">" seg [spec]]               (* >k: aynı şema; >k{..}: kendi şeması *)
+item(d)   = I(d) "- " (inline | entry-tail) NL [blocks] [object(d+1)]
+spec      = "{" cols(" ") "}" [">" [seg] [spec]]           (* >k ya da tek başına > (aynı anahtar, bpp4) *)
 col       = path ["?" ["="]] [":str"]                      (* ? ve ?= yalnızca boşluklu başlıkta *)
 path      = seg {"." seg}                                   (* bpp3; bpp1/2: tek anahtar *)
 seg       = "." içermeyen anahtar  |  jsonstring
-inline    = scalar | "[" [scalar {"," scalar}] "]" | "{}"
-scalar    = "null" | "true" | "false" | number | jsonstring | "*" digits | barestring
+inline    = scalar | "[" [scalar {"," scalar}] "]" | "{}"   (* [..] içinde blok yok *)
+scalar    = "null" | "true" | "false" | number | jsonstring | "*" digits | "|" digits | barestring
+blocks    = satırdaki "|N" işaretlerinin ham satırları, her biri N satır, sırayla   (* bpp4 *)
 I(d)      = d × " "
 ```
 
 ## 11. Sürüm geçmişi
 
+* **bpp4** — Konu Markdown: bpp3 düz yazıda kaynağa kaybediyordu (README o200k'de 3845'e karşı
+  3722 token). Eklenenler: çok satırlı string'ler için `|N` blokları (§2.2), birleştirilen yumuşak
+  satır sonları (§7.1), tablonun kendi çocuk anahtarı için tek başına `>`, ağaçla yarışan alt
+  tablolar (§4.3.1), yalnızca rakamdan önce tırnaklanan `*`, kaynağı saklayan `bpp4 md` biçimi
+  (§7.2) ve yalnızca kullanılanı anlatan primer (§8). §7.1'deki beş Markdown belgesi o200k'de
+  Markdown olarak 15072, bpp3'te 15510, bpp4'te 14824 token (claude2'de 15844, 16094 ve 15513);
+  her biri artık kaynağından küçük. Hiçbir JSON, YAML, CSV örneği büyümedi: `plan.json` 636 → 634
+  (o200k) ve her primer kısaldı. Decoder bpp1–bpp3 başlıklarını eski kurallarıyla okur (orada `|2`
+  bir string'dir ve `>` ad ister).
 * **bpp3** — Sütun yolları (`customer.name`) ve kendi sütunları olan alt tablolar
   (`>items{sku qty name}`) eklendi; iç içe nesne ve alt liste içeren nesne dizileri artık satır
   tablosuna sığıyor. Ölçüm (`examples/orders.json`): 1762 → 1151 token (o200k, −%34.7), 1839 → 1178

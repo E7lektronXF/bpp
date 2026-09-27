@@ -138,3 +138,145 @@ Missing fields are empty cells. The `>steps` suffix names the child key.
 | mixed ' ' | 1947 | 2194 | +467.6 | +477.4 |
 | plan-nested ':' | 1130 | 1230 | +229.4 | +223.7 |
 | plan-nested ' ' | 1067 | 1133 | +211.1 | +198.2 |
+
+### E10 Multi-line strings: JSON string vs `|N` block (bpp4)
+
+Whole documents, encoded as trees with every other bpp4 rule on.
+
+o200k:
+
+| variant | README.md | SPEC.md | BENCHMARK.md | RELEASING.md | project_plan.md | total |
+|---|---:|---:|---:|---:|---:|---:|
+| all quoted (bpp3) | 3801 | 6325 | 3819 | 498 | 758 | 15201 |
+| all blocks | 3703 | 6144 | 3724 | 494 | 759 | 14824 |
+| block when estimated gain >= 0 (chosen) | 3703 | 6144 | 3724 | 495 | 758 | 14824 |
+
+claude2:
+
+| variant | README.md | SPEC.md | BENCHMARK.md | RELEASING.md | project_plan.md | total |
+|---|---:|---:|---:|---:|---:|---:|
+| all quoted (bpp3) | 3977 | 6449 | 3786 | 541 | 996 | 15749 |
+| all blocks | 3894 | 6330 | 3756 | 533 | 995 | 15508 |
+| block when estimated gain >= 0 (chosen) | 3894 | 6330 | 3756 | 537 | 996 | 15513 |
+
+
+### E11 Markdown soft line breaks
+
+o200k:
+
+| variant | README.md | SPEC.md | BENCHMARK.md | RELEASING.md | project_plan.md | total |
+|---|---:|---:|---:|---:|---:|---:|
+| keep every line break (bpp3) | 3727 | 6273 | 3765 | 506 | 788 | 15059 |
+| join item titles only | 3714 | 6182 | 3761 | 498 | 760 | 14915 |
+| join item titles and note paragraphs (chosen) | 3703 | 6144 | 3724 | 495 | 758 | 14824 |
+
+claude2:
+
+| variant | README.md | SPEC.md | BENCHMARK.md | RELEASING.md | project_plan.md | total |
+|---|---:|---:|---:|---:|---:|---:|
+| keep every line break (bpp3) | 3920 | 6454 | 3801 | 545 | 1017 | 15737 |
+| join item titles only | 3911 | 6377 | 3801 | 540 | 998 | 15627 |
+| join item titles and note paragraphs (chosen) | 3894 | 6330 | 3756 | 537 | 996 | 15513 |
+
+
+### E12 Child key of a tree: `>steps` vs bare `>`
+
+o200k:
+
+| variant | README.md | SPEC.md | BENCHMARK.md | RELEASING.md | project_plan.md | total |
+|---|---:|---:|---:|---:|---:|---:|
+| `>steps` (bpp3) | 3705 | 6148 | 3726 | 499 | 762 | 14840 |
+| bare `>` (chosen) | 3703 | 6144 | 3724 | 495 | 758 | 14824 |
+
+claude2:
+
+| variant | README.md | SPEC.md | BENCHMARK.md | RELEASING.md | project_plan.md | total |
+|---|---:|---:|---:|---:|---:|---:|
+| `>steps` (bpp3) | 3895 | 6332 | 3757 | 539 | 998 | 15521 |
+| bare `>` (chosen) | 3894 | 6330 | 3756 | 537 | 996 | 15513 |
+
+
+### E12b Bare `>` on the JSON plan (examples/plan.json)
+
+| variant | o200k | claude2 | Δ% o200k | Δ% claude2 |
+|---|---:|---:|---:|---:|
+| `>steps` (bpp3) | 636 | 728 | +0.0 | +0.0 |
+| bare `>` (chosen) | 634 | 727 | -0.3 | -0.1 |
+
+### E13 Strings starting with `*`: always quoted vs only `*n`
+
+o200k:
+
+| variant | README.md | SPEC.md | BENCHMARK.md | RELEASING.md | project_plan.md | total |
+|---|---:|---:|---:|---:|---:|---:|
+| quote every leading `*` (bpp3) | 3711 | 6151 | 3725 | 495 | 758 | 14840 |
+| quote only `*<digits>` (chosen) | 3703 | 6144 | 3724 | 495 | 758 | 14824 |
+
+claude2:
+
+| variant | README.md | SPEC.md | BENCHMARK.md | RELEASING.md | project_plan.md | total |
+|---|---:|---:|---:|---:|---:|---:|
+| quote every leading `*` (bpp3) | 3898 | 6332 | 3758 | 537 | 996 | 15521 |
+| quote only `*<digits>` (chosen) | 3894 | 6330 | 3756 | 537 | 996 | 15513 |
+
+
+### E14 Layout of Markdown trees and the estimator
+
+bpp4 estimator: `?=`, `=|` and `"=` stay two tokens, and a run of newlines is one. The child table gives the top level (headings) its own columns, so a heading's note can be positional (`|7 Title`) instead of keyed (`note=|7 Title`).
+
+o200k:
+
+| variant | README.md | SPEC.md | BENCHMARK.md | RELEASING.md | project_plan.md | total |
+|---|---:|---:|---:|---:|---:|---:|
+| tree only, bpp3 estimator | 3703 | 6156 | 3724 | 498 | 760 | 14841 |
+| tree or child table, bpp3 estimator | 3703 | 6144 | 3724 | 498 | 758 | 14827 |
+| tree or child table, bpp4 estimator (chosen) | 3703 | 6144 | 3724 | 495 | 758 | 14824 |
+
+claude2:
+
+| variant | README.md | SPEC.md | BENCHMARK.md | RELEASING.md | project_plan.md | total |
+|---|---:|---:|---:|---:|---:|---:|
+| tree only, bpp3 estimator | 3894 | 6343 | 3756 | 538 | 995 | 15526 |
+| tree or child table, bpp3 estimator | 3894 | 6330 | 3756 | 538 | 996 | 15514 |
+| tree or child table, bpp4 estimator (chosen) | 3894 | 6330 | 3756 | 537 | 996 | 15513 |
+
+
+### E15 Markdown: source vs bpp, primers and the `bpp4 md` fallback
+
+o200k:
+
+| variant | README.md | SPEC.md | BENCHMARK.md | RELEASING.md | project_plan.md | total |
+|---|---:|---:|---:|---:|---:|---:|
+| Markdown source | 3722 | 6269 | 3747 | 497 | 837 | 15072 |
+| `bpp4 md` + source | 3727 | 6274 | 3752 | 502 | 842 | 15097 |
+| bpp tree (no primer) | 3703 | 6144 | 3724 | 495 | 758 | 14824 |
+| bpp tree + JSON primer | 3775 | 6232 | 3796 | 567 | 829 | 15199 |
+| bpp tree + Markdown primer | 3756 | 6207 | 3777 | 556 | 822 | 15118 |
+| encode_md (chosen) | 3703 | 6144 | 3724 | 495 | 758 | 14824 |
+| encode_md + primer (chosen) | 3727 | 6207 | 3752 | 502 | 822 | 15010 |
+
+claude2:
+
+| variant | README.md | SPEC.md | BENCHMARK.md | RELEASING.md | project_plan.md | total |
+|---|---:|---:|---:|---:|---:|---:|
+| Markdown source | 3938 | 6483 | 3802 | 543 | 1078 | 15844 |
+| `bpp4 md` + source | 3943 | 6488 | 3807 | 548 | 1083 | 15869 |
+| bpp tree (no primer) | 3894 | 6330 | 3756 | 537 | 996 | 15513 |
+| bpp tree + JSON primer | 3969 | 6423 | 3831 | 611 | 1070 | 15904 |
+| bpp tree + Markdown primer | 3950 | 6397 | 3812 | 601 | 1062 | 15822 |
+| encode_md (chosen) | 3894 | 6330 | 3756 | 537 | 996 | 15513 |
+| encode_md + primer (chosen) | 3943 | 6397 | 3807 | 548 | 1062 | 15757 |
+
+
+### E16 Primer length (absolute tokens)
+
+The bpp4 one-line primer lists only the syntax the output uses (SPEC §8).
+
+| variant | o200k | claude2 | Δ% o200k | Δ% claude2 |
+|---|---:|---:|---:|---:|
+| bpp3 one-line primer | 84 | 88 | +0.0 | +0.0 |
+| bpp4 primer, project_plan.md | 64 | 65 | -23.8 | -26.1 |
+| bpp4 primer, plan.json | 64 | 66 | -23.8 | -25.0 |
+| bpp4 primer, examples/quickstart.json | 40 | 42 | -52.4 | -52.3 |
+| bpp4 primer, every feature | 108 | 114 | +28.6 | +29.5 |
+| bpp4 3-line primer (--primer long) | 156 | 166 | +85.7 | +88.6 |
