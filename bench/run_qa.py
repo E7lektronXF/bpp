@@ -274,7 +274,9 @@ def ask_openai(base_url, key, model, user, max_tokens=4000, extra=None):
                                     {"role": "user", "content": user}]}).encode()
     req = urllib.request.Request(base_url.rstrip("/") + "/chat/completions", data=body, headers={
         "Authorization": f"Bearer {key}", "Content-Type": "application/json",
-        "Accept": "application/json"})
+        "Accept": "application/json",
+        # Some providers' firewalls (Groq/Cloudflare error 1010) reject urllib's default agent.
+        "User-Agent": "bpp-bench/0.4 (+https://github.com/E7lektronXF/bpp)"})
     for attempt in range(10):
         try:
             with urllib.request.urlopen(req, timeout=600) as r:
