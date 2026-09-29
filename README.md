@@ -69,7 +69,8 @@ If `pip` isn't found, use `python3 -m pip` on macOS/Linux or `py -m pip` on Wind
 > `pip install bpp` installs an unrelated project.
 
 Optional: `pip install "bpp-format[stats]"` also installs tiktoken, for exact token counts instead
-of estimates.
+of estimates. `bpp stats` downloads the tokenizer the first time; converting a file never goes
+online, so until then the summary line of a conversion is an estimate.
 
 ```bash
 bpp --version      # bpp 0.4.0
@@ -233,7 +234,7 @@ encodings usually cost more tokens and hurt understanding. bpp saves tokens by:
 | CSV | Cells and column order come back byte for byte. Numbers are typed only when writing them back gives the same text (`007` and `1.50` stay strings). |
 | Markdown | Structure is kept, formatting is not (soft line breaks are joined). Output is normalized Markdown that parses back to the same tree. A file kept as `bpp4 md` comes back byte for byte. |
 
-Backed by 240 tests: edge cases (empty containers, 80-level nesting, delimiters inside strings,
+Backed by 252 tests: edge cases (empty containers, 80-level nesting, delimiters inside strings,
 multi-line text, Unicode, number-like strings) and hypothesis property tests on random JSON, CSV,
 YAML and Markdown trees.
 
@@ -287,7 +288,7 @@ bpp stats data.json [--markdown]
 | `pip: command not found` | `python3 -m pip install ...` (macOS/Linux) or `py -m pip install ...` (Windows). |
 | `externally-managed-environment` | `pipx install bpp-format`, or install inside a virtualenv (`python3 -m venv .venv && . .venv/bin/activate`). |
 | `cannot infer format` | Use one of these extensions: `.json .yaml .yml .csv .md .bpp`. |
-| `... exists; use -o ...` | bpp refused to overwrite your original file. Pick another name with `-o`. |
+| `... exists; use -o ...` | bpp refused to overwrite an existing file: your original, or a `.bpp` you may have edited. Pick another name with `-o`, or pass `--force`. |
 
 Upgrade with `pip install --upgrade bpp-format`. Uninstall
 with `pip uninstall bpp-format`.
@@ -297,7 +298,7 @@ with `pip uninstall bpp-format`.
 ```bash
 git clone https://github.com/E7lektronXF/bpp.git && cd bpp
 pip install -e ".[dev]"        # + pytest, hypothesis, tiktoken
-pytest -q                      # 240 tests
+pytest -q                      # 252 tests
 python bench/run_tokens.py     # regenerate the token benchmark
 python bench/experiments.py    # the design experiments behind SPEC.md
 GROQ_API_KEY=... python bench/run_qa.py --provider groq   # comprehension benchmark on Groq's free tier

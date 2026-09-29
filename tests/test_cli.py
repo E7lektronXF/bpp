@@ -104,6 +104,40 @@ def test_one_step_mode(files, capsys):
     assert capsys.readouterr().out.startswith("bpp4\n# bpp4 Markdown:")
 
 
+def test_one_step_mode_never_overwrites(files, capsys):
+    src = (files / "c.json").read_text(encoding="utf-8")
+    assert run(files / "c.json", "-o", files / "c.json") == 1  # the input itself
+    assert (files / "c.json").read_text(encoding="utf-8") == src
+    _write(files / "c.bpp", "bpp4\nnote edited by hand\n")
+    assert run(files / "c.json") == 1
+    assert "c.bpp exists" in capsys.readouterr().err
+    assert (files / "c.bpp").read_text(encoding="utf-8") == "bpp4\nnote edited by hand\n"
+    assert run(files / "c.json", "--force") == 0
+    assert run("decode", files / "c.bpp", "-o", files / "back.json") == 0
+    assert json.loads((files / "back.json").read_text(encoding="utf-8")) == ds.config()
+
+
+def test_one_step_summary_stays_offline(files, capsys, monkeypatch):
+    # The summary line must not fetch a tokenizer or call an API: tiktoken's download
+    # has no timeout, so a network that drops packets stalled `bpp FILE` for minutes.
+    from bpp import tokens
+
+    def online(*args, **kwargs):
+        raise AssertionError("network access")
+
+    monkeypatch.setattr(tokens, "available_counters", online)
+    monkeypatch.setattr(tokens, "_fetch_tgz_member", online)
+    monkeypatch.setenv("TIKTOKEN_CACHE_DIR", str(files / "empty-cache"))
+    assert run(files / "c.json") == 0
+    assert "rough estimate" in capsys.readouterr().err
+
+
+def test_deep_nesting_is_a_clean_error(files, capsys):
+    _write(files / "deep.json", "[" * 600 + "0" + "]" * 600)
+    assert run(files / "deep.json", "-o", "-") == 1
+    assert "nested too deeply" in capsys.readouterr().err
+
+
 def test_markdown_passthrough_decodes_verbatim(files, capsys):
     src = "Some *text*\nwrapped here.\n\n| a | b |\n|---|---|\n"
     _write(files / "t.md", src)

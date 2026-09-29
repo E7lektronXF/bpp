@@ -146,7 +146,8 @@ bpp + primer       284    114      126           -34.1%             -32.3%
 ```
 
 `o200k` ve `claude2` sütunları için `pip install tiktoken` gerekir; kurulu değilse yaklaşık bir tahmin
-(`estimate`) gösterilir. Bu kadar küçük bir dosyada primer'li hali minified JSON'dan pahalıdır;
+(`estimate`) gösterilir. Tokenizer'ı ilk `bpp stats` indirir; dosya dönüştürmek hiçbir zaman internete
+çıkmaz, bu yüzden o zamana kadar dönüşümdeki özet satırı da tahmindir. Bu kadar küçük bir dosyada primer'li hali minified JSON'dan pahalıdır;
 primer'i büyük dosyalarda kullanın.
 
 ### Python kodundan kullanın
@@ -170,7 +171,7 @@ metin = bpp.encode_md(markdown)  # Markdown metni -> .bpp (daha kısaysa kaynağ
 | `pip: command not found` | Windows: `py -m pip install ...` · macOS/Linux: `python3 -m pip install ...` |
 | `error: externally-managed-environment` (yeni macOS/Linux) | `pipx install bpp-format` ya da bir sanal ortam kullanın: `python3 -m venv .venv && . .venv/bin/activate` ve 2. adımı tekrarlayın. |
 | `cannot infer format` | Dosya uzantısı `.json .yaml .yml .csv .md .bpp` olmalı. |
-| `... exists; use -o ...` | Geri çevirirken orijinal dosyanın üzerine yazılmasın diye durdu. `-o başka_ad.json` verin. |
+| `... exists; use -o ...` | Var olan bir dosyanın (orijinaliniz ya da elle düzenlediğiniz bir `.bpp`) üzerine yazmamak için durdu. `-o` ile başka bir ad verin ya da `--force` ekleyin. |
 
 Güncellemek için: `pip install --upgrade bpp-format`. Kaldırmak için: `pip uninstall bpp-format`.
 
@@ -365,7 +366,7 @@ satırı için `cd bench/toon && npm install` gerekir.
 
 ```bash
 pip install -e ".[dev]"
-pytest -q                      # 240 test: round-trip, uç durumlar, hypothesis, CLI, JS paritesi
+pytest -q                      # 252 test: round-trip, uç durumlar, hypothesis, CLI, JS paritesi
 python bench/run_tokens.py     # token benchmark'ını yeniden üret
 python bench/experiments.py    # SPEC'teki tasarım deneyleri
 ```

@@ -29,6 +29,7 @@ import tarfile
 import tempfile
 import urllib.request
 from functools import lru_cache
+from importlib.util import find_spec
 from pathlib import Path
 from typing import Callable
 
@@ -90,9 +91,14 @@ def _expand_ranks(bpe_ranks: str) -> dict[bytes, int]:
     return ranks
 
 
+def _o200k_cache_path() -> Path:
+    # The file tiktoken.get_encoding("o200k_base") reads before it tries to download
+    return _tiktoken_cache_dir() / hashlib.sha1(O200K_URL.encode()).hexdigest()
+
+
 def bootstrap_o200k() -> None:
     """Populate tiktoken's cache with o200k_base fetched via npm."""
-    path = _tiktoken_cache_dir() / hashlib.sha1(O200K_URL.encode()).hexdigest()
+    path = _o200k_cache_path()
     if path.exists():
         return
     d = _parse_js_ranks(
@@ -183,3 +189,21 @@ def available_counters() -> dict[str, Callable[[str], int]]:
 
         out["estimate"] = est_tokens
     return out
+
+
+def quick_counter() -> tuple[str, Callable[[str], int]]:
+    """One counter that never downloads anything or calls an API, for the summary line
+    of `bpp FILE`: o200k if tiktoken already has it cached, else the estimator.
+
+    available_counters() may fetch tokenizers (tiktoken's download has no timeout, so a
+    network that drops packets stalls it for minutes) and call the Anthropic API.
+    """
+    if find_spec("tiktoken") and _o200k_cache_path().exists():
+        try:
+            enc = _o200k()
+            return "o200k", lambda s: len(enc.encode_ordinary(s))
+        except Exception:
+            pass
+    from .estimate import est_tokens
+
+    return "estimate", est_tokens

@@ -7,6 +7,7 @@ import os
 import shutil
 import subprocess
 import sys
+from importlib.util import find_spec
 from pathlib import Path
 
 from . import __version__
@@ -161,40 +162,60 @@ def cmd_stats(a) -> int:
 
 def _savings(src: str, out: str) -> str:
     try:
-        from .tokens import available_counters
+        from .tokens import quick_counter
 
-        name, fn = next(iter(available_counters().items()))
+        name, fn = quick_counter()  # offline: `bpp stats` is what fetches tokenizers
     except Exception:
         return ""
     a, b = fn(src), fn(out)
     if not a:
         return ""
     if name == "estimate":
+        how = "run bpp stats" if find_spec("tiktoken") else "pip install tiktoken"
         return (f" (~{a} -> ~{b} tokens, {100 * (b - a) / a:+.0f}%, rough estimate; "
-                "pip install tiktoken for exact counts)")
+                f"{how} for exact counts)")
     return f" ({name}: {a} -> {b} tokens, {100 * (b - a) / a:+.0f}%)"
 
 
+def _refuse_overwrite(out: str, force: bool):
+    if out != "-" and Path(out).exists() and not force:
+        raise ValueError(f"{out} exists; use -o to pick another name or --force to overwrite")
+
+
 def cmd_auto(a) -> int:
-    """`bpp FILE`: .bpp files are decoded, everything else is encoded."""
+    """`bpp FILE`: .bpp files are decoded, everything else is encoded.
+
+    Neither direction overwrites an existing file without --force: the output of an
+    encode can be the input itself (`-o data.json`) or a .bpp file edited by hand.
+    """
     src = Path(a.input)
     if src.suffix.lower() == ".bpp":
         to = a.to or (detect(a.output) if a.output and a.output != "-" else "json")
         out = a.output or str(src.with_suffix("." + {"yaml": "yaml", "md": "md",
                                                         "csv": "csv"}.get(to, "json")))
-        if out != "-" and Path(out).exists() and not a.force:
-            raise ValueError(f"{out} exists; use -o to pick another name or --force to overwrite")
+        _refuse_overwrite(out, a.force)
         text = _decode(_read(a.input), to)
         _write(out, text)
     else:
         fmt = detect(src)
         raw = _read(a.input)
         out = a.output or str(src.with_suffix(".bpp"))
+        _refuse_overwrite(out, a.force)
         text = _encode(raw, fmt, primer=a.primer)
         _write(out, text)
         if out != "-":
             print(f"{src} -> {out}{_savings(raw, text)}", file=sys.stderr)
     return 0
+
+
+def _run(fn, a) -> int:
+    try:
+        return fn(a)
+    except RecursionError:
+        print("bpp: error: the input is nested too deeply", file=sys.stderr)
+    except (ValueError, OSError) as ex:
+        print(f"bpp: error: {ex}", file=sys.stderr)
+    return 1
 
 
 def _auto_main(argv: list[str]) -> int:
@@ -205,13 +226,8 @@ def _auto_main(argv: list[str]) -> int:
     p.add_argument("-o", "--output", help="output file, '-' for stdout (default: next to input)")
     p.add_argument("--to", choices=["json", "yaml", "csv", "md"], help="decode target format")
     p.add_argument("--primer", action="store_true", help="add a one-line format explanation")
-    p.add_argument("-f", "--force", action="store_true", help="overwrite when decoding")
-    a = p.parse_args(argv)
-    try:
-        return cmd_auto(a)
-    except (ValueError, OSError) as ex:
-        print(f"bpp: error: {ex}", file=sys.stderr)
-        return 1
+    p.add_argument("-f", "--force", action="store_true", help="overwrite an existing output file")
+    return _run(cmd_auto, p.parse_args(argv))
 
 
 def _utf8_console():
@@ -259,11 +275,7 @@ def main(argv: list[str] | None = None) -> int:
     s.set_defaults(fn=cmd_stats)
 
     a = p.parse_args(argv)
-    try:
-        return a.fn(a)
-    except (ValueError, OSError) as ex:
-        print(f"bpp: error: {ex}", file=sys.stderr)
-        return 1
+    return _run(a.fn, a)
 
 
 if __name__ == "__main__":
