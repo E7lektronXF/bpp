@@ -42,6 +42,8 @@ const STRIP_RE = new RegExp(`^[${PYWS}]+|[${PYWS}]+$`, 'gu');
 const pyStrip = (s) => s.replace(STRIP_RE, '');
 const CTRL = /[\x00-\x1f\x7f]/;
 const NUM_RE = /^-?(?:0|[1-9]\p{Nd}*)(?:\.\p{Nd}+)?(?:[eE][+-]?\p{Nd}+)?$/u;
+// A number is read only with ASCII digits (JSON's grammar); NUM_RE decides quoting.
+const JSON_NUM_RE = /^-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?$/;
 const BARE_KEY_RE = new RegExp(`[^${PYWS}"\\[\\]{}=,:?>\\x00-\\x1f\\x7f]+`, 'uy');
 const BARE_SEG_RE = new RegExp(`[^${PYWS}"\\[\\]{}=,:?>.\\x00-\\x1f\\x7f]+`, 'uy');
 const BARE_SEG_FULL = new RegExp(`^[^${PYWS}"\\[\\]{}=,:?>.\\x00-\\x1f\\x7f]+$`, 'u');
@@ -650,9 +652,7 @@ function makePrimer(lines, hasRefs, markdown) {
 function parseBare(tok, strmode) {
   if (strmode) return tok === 'null' ? null : tok;
   if (SPECIAL.has(tok)) return SPECIAL.get(tok);
-  if (NUM_RE.test(tok)) {
-    try { return numFromText(tok); } catch { return tok; }
-  }
+  if (JSON_NUM_RE.test(tok)) return numFromText(tok);
   return tok;
 }
 
@@ -859,6 +859,7 @@ class Dec {
       if (ln.text.startsWith('- ') || ln.text === '-') throw new BppError('list item outside a list', ln.no);
       this.take();
       const [k, v] = this.entry(ln, 0, d);
+      if (obj.has(k)) throw new BppError(`duplicate key '${k}'`, ln.no);
       obj.set(k, v);
     }
     return obj;
@@ -934,6 +935,19 @@ class Dec {
       if (delim === null) delim = sep;
       if (sep !== delim || !', '.includes(sep) || !sep) c.err('bad column list');
       c.i++;
+    }
+    // Two columns for one key would silently drop a value (the encoder never writes them).
+    const seen = new Set();
+    for (const { path } of cols) {
+      if (seen.has(pathKey(path))) c.err(`duplicate column '${path.join('.')}'`);
+      seen.add(pathKey(path));
+    }
+    for (const { path } of cols) {
+      for (let i = 1; i < path.length; i++) {
+        if (seen.has(pathKey(path.slice(0, i)))) {
+          c.err(`column '${path.join('.')}' conflicts with '${path.slice(0, i).join('.')}'`);
+        }
+      }
     }
     let child = null, sub = null;
     if (c.peek() === '>') {
@@ -1232,7 +1246,7 @@ export function toPlain(v) {
 function csvInfer(cell) {
   if (cell === '') return null;
   if (cell === 'true' || cell === 'false') return cell === 'true';
-  if (NUM_RE.test(cell) && /^-?[0-9.eE+]+$/.test(cell)) {
+  if (JSON_NUM_RE.test(cell)) {
     if (/^-?(?:0|[1-9][0-9]*)$/.test(cell)) return cell === '-0' ? cell : new Num(BigInt(cell).toString());
     const f = parseFloat(cell);
     if (Number.isFinite(f) && pyFloatRepr(f) === cell) return new Num(cell);

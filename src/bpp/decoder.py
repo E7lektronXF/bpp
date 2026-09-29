@@ -190,6 +190,8 @@ class _Dec:
                 raise BppError("list item outside a list", ln.no)
             self.take()
             k, v = self.entry(ln, 0, d)
+            if k in obj:
+                raise BppError(f"duplicate key {k!r}", ln.no)
             obj[k] = v
         return obj
 
@@ -279,6 +281,17 @@ class _Dec:
             if sep != delim or sep not in ", ":
                 c.err("bad column list")
             c.i += 1
+        # Two columns for one key would silently drop a value (the encoder never writes them).
+        seen: set = set()
+        for col in cols:
+            if col[0] in seen:
+                c.err(f"duplicate column {'.'.join(col[0])!r}")
+            seen.add(col[0])
+        for col in cols:
+            p = col[0]
+            for i in range(1, len(p)):
+                if p[:i] in seen:
+                    c.err(f"column {'.'.join(p)!r} conflicts with {'.'.join(p[:i])!r}")
         child = sub = None
         if c.peek() == ">":
             c.i += 1

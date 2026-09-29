@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 import datasets as ds
-from bpp import decode, encode, encode_md
+from bpp import BppError, decode, encode, encode_md
 from bpp.formats import dump_csv
 from test_roundtrip import CASES
 
@@ -84,6 +84,20 @@ MD_VOCAB = [
 ]
 
 
+# CSV cells read as numbers only when they are JSON numbers (ASCII digits) that print back the same
+CSV_NUMBERS = "".join(f"{c}\n" for c in ["n", "1e-05", "-2.5e-07", "1E5", "007", "-0", "1.50", "10",
+                                          "12345678901234567890", "1５", "2٠٢٦", "٣", "0.1"])
+
+# Hand-written input: both decoders must read it the same way, or both reject it (back = None)
+DECODE_CASES = [
+    "bpp4\na 1٣\nb 1.٣\nc [2٠٢٦,7]\nd -1e-05\n",
+    "bpp4\na 1\na 2\n", "bpp4\ns\n x 1\n x 2\n", "bpp4\nl[1]\n- a 1\n a 2\n",
+    "bpp4\nt[1]{a a}\n1 2\n", "bpp4\nt[1]{a,a}\n1,2\n", "bpp4\nt[1]{a.b a}\n1 2\n",
+    "bpp4\nt[1]{a a.b?}\n1 2\n", "bpp4\nt[1]{a b}>k{c c}\n1 x\n 2 3\n",
+    "bpp4\nt[1]{a.b a.c}\n1 2\n", "bpp2\nt[1]{a.b a}\n1 2\n",
+]
+
+
 def _back(text):
     return json.dumps(decode(text), ensure_ascii=False, separators=(",", ":"))
 
@@ -117,11 +131,17 @@ def corpus():
         for primer in (False, True):
             out = encode_md(text, primer=primer)
             cases.append({"md": text, "opts": {"primer": primer}, "bpp": out, "back": _back(out)})
-    csv_text = dump_csv(ds.employees())
     from bpp.formats import load_csv
-    rows = load_csv(csv_text)
-    cases.append({"csv": csv_text, "opts": {"keepOrder": True}, "bpp": encode(rows, keep_order=True),
-                  "back": _back(encode(rows, keep_order=True))})
+    for csv_text in (dump_csv(ds.employees()), CSV_NUMBERS):
+        rows = load_csv(csv_text)
+        cases.append({"csv": csv_text, "opts": {"keepOrder": True}, "bpp": encode(rows, keep_order=True),
+                      "back": _back(encode(rows, keep_order=True))})
+    for text in DECODE_CASES:
+        try:
+            back = _back(text)
+        except BppError:
+            back = None
+        cases.append({"bpp": text, "back": back})
     return cases
 
 

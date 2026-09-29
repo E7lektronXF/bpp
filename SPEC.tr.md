@@ -55,7 +55,7 @@ tab girinti claude2'de +%12 kötü.
 |---|---|---|
 | null | `null` | |
 | bool | `true` / `false` | `T/F` veya `1/0` ölçüldü: kazanç yok (E1) |
-| sayı | JSON sayı grameri: `42`, `-3.5`, `1.0`, `1e-7` | `1` (int) ve `1.0` (float) ayrımı korunur |
+| sayı | JSON sayı grameri, ASCII rakamlar: `42`, `-3.5`, `1.0`, `1e-7` | `1` (int) ve `1.0` (float) ayrımı korunur |
 | özel sayı | `NaN`, `Infinity`, `-Infinity` | yalnızca YAML girdisi için |
 | string (çıplak) | `Ahmet Yılmaz` | bağlama göre satır sonuna/ayraca kadar |
 | string (tırnaklı) | `"satır1\nsatır2"` | JSON string sözdizimi ve escape'leri |
@@ -73,7 +73,8 @@ Bir string **çıplak** yazılır; aşağıdakilerden biri doğruysa JSON string
 * `*` ya da `|` ve ardından yalnızca rakamlardan oluşuyor (`*12`, `|3`): referans ya da blok
   işareti;
 * `null`, `true`, `false`, `NaN`, `Infinity`, `-Infinity` ile birebir aynı;
-* JSON sayı gramerine uyuyor (`"42"`, `"1.1"`, `"-0"`);
+* JSON sayı gramerine uyuyor (`"42"`, `"1.1"`, `"-0"`), ASCII dışı rakamlarla bile (`"1٣"`):
+  decoder'lar yalnızca ASCII rakamları sayı olarak okur, ama bpp 0.4.0 `1٣`'ü 13 diye okurdu;
 * bağlamın ayracını içeriyor (tabloda `,`, satır tablosunda boşluk, satır içi listede `,` ve `]`);
 * liste öğesi (`- `) içinde ve boşluk içeriyor (bkz. §5).
 
@@ -153,6 +154,7 @@ service
   `-#&*` ile başlamıyorsa ve blok işareti (`|3`) değilse. Aksi halde JSON string olarak tırnaklanır (`"first name" Ali`).
   Unicode harfli anahtarlar (`şehir`) çıplak yazılır.
 * Anahtar sırası korunur.
+* Bir nesnede her anahtar en fazla bir kez geçer; decoder'lar tekrarlanan anahtarı reddeder.
 
 **Ölçüm (E2, E9):** `key value`, `key:value`'ya göre config'te −%2.9/−%7.1, karma belgede
 −%5.8/−%5.3, planda −%5.6/−%7.9 (o200k/claude2). Neden: boşluk bir sonraki kelimenin token'ına
@@ -291,7 +293,9 @@ A-2 Wilmslow sent Alan Turing
   ve `:str` olabilir; anahtarlı opsiyonel yol `a.b=değer` diye yazılır. Decode sırasında bir nesne,
   sütunlarından en az biri satırda varsa oluşturulur; böylece var olan ve olmayan nesneler birebir
   geri gelir. Düzleştirme yalnızca tüm satırlar uyuşuyorsa kullanılır: `k` bir satırda nesne,
-  başka satırda düz değerse dizi satır tablosu olarak yazılmaz.
+  başka satırda düz değerse dizi satır tablosu olarak yazılmaz. Bir başlıktaki yollar birbirinden
+  farklıdır ve hiçbiri diğerinin öneki değildir, yani her değerin tek bir sütunu vardır;
+  decoder'lar `{a a}` ve `{a a.b}` başlıklarını reddeder.
 * **Alt tablolar.** Tek başına `>child`, alt satırların aynı sütunları kullandığı anlamına gelir
   (planlardaki gibi ağaç). `>child{...}` alt satırlara kendi sütunlarını verir. Alt satırlar üst
   satırın altında bir boşluk girintiyle yazılır; alt tabloların da kendi alt tabloları olabilir

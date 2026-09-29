@@ -164,6 +164,14 @@ def test_crlf_input():
     ("bpp2\nl[1]\n- [1,2] x\n", "trailing"),
     ("bpp2\nl[1]\n- a 1\n a 2\n", "duplicate"),
     ("bpp2\nl[1]\n- {} x\n", "trailing"),
+    # a duplicate key or column would silently drop a value
+    ("bpp4\na 1\na 2\n", "duplicate key 'a'"),
+    ("bpp4\ns\n x 1\n x 2\n", "duplicate key 'x'"),
+    ("bpp4\nt[1]{a a}\n1 2\n", "duplicate column 'a'"),
+    ("bpp4\nt[1]{a,a}\n1,2\n", "duplicate column 'a'"),
+    ("bpp4\nt[1]{a.b a}\n1 2\n", "'a.b' conflicts with 'a'"),
+    ("bpp4\nt[1]{a a.b?}\n1 2\n", "'a.b' conflicts with 'a'"),
+    ("bpp4\nt[1]{a b}>k{c c}\n1 x\n 2 3\n", "duplicate column 'c'"),
 ])
 def test_errors(text, msg):
     with pytest.raises(BppError, match=msg):
@@ -174,6 +182,14 @@ def test_error_has_line_number():
     with pytest.raises(BppError) as e:
         decode("bpp2\na 1\nb\n")
     assert e.value.line == 3
+
+
+def test_numbers_need_ascii_digits():
+    # JSON's number grammar: `1٣` or `1.５` are text, not 13 or 1.5
+    assert decode("bpp4\na 1٣\nb 1.５\nc [2٠٢٦,7]\nd 1e-05\n") == {
+        "a": "1٣", "b": "1.５", "c": ["2٠٢٦", 7], "d": 1e-05}
+    # the encoder still quotes them, so older decoders do not read them as numbers
+    assert body(encode({"a": "1٣"})) == 'a "1٣"'
 
 
 # ---------------------------------------------------------------- bpp3 ---

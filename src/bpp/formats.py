@@ -9,7 +9,7 @@ import math
 import re
 from pathlib import Path
 
-from .lexer import NUM_RE
+from .lexer import JSON_NUM_RE
 
 FORMATS = ("json", "yaml", "csv", "md", "bpp")
 _EXT = {".json": "json", ".yaml": "yaml", ".yml": "yaml", ".csv": "csv",
@@ -92,8 +92,8 @@ def _infer(cell: str):
         return None
     if cell in ("true", "false"):
         return cell == "true"
-    if NUM_RE.fullmatch(cell):
-        if re.fullmatch(r"-?(?:0|[1-9]\d*)", cell):
+    if JSON_NUM_RE.fullmatch(cell):
+        if re.fullmatch(r"-?(?:0|[1-9][0-9]*)", cell):
             return int(cell) if cell != "-0" else cell
         f = float(cell)
         if math.isfinite(f) and repr(f) == cell:

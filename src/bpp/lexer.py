@@ -7,6 +7,9 @@ import math
 import re
 
 NUM_RE = re.compile(r"-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?")
+# A number is read only with ASCII digits (JSON's grammar).  NUM_RE's \d also matches
+# digits such as ٣ or ５: strings like "1٣" are quoted when written, but they are text.
+JSON_NUM_RE = re.compile(NUM_RE.pattern, re.ASCII)
 SPECIAL = {"null": None, "true": True, "false": False,
            "NaN": math.nan, "Infinity": math.inf, "-Infinity": -math.inf}
 _CTRL = re.compile(r"[\x00-\x1f\x7f]")
@@ -130,7 +133,7 @@ def parse_bare(tok: str, strmode: bool = False):
         return None if tok == "null" else tok
     if tok in SPECIAL:
         return SPECIAL[tok]
-    if NUM_RE.fullmatch(tok):
+    if JSON_NUM_RE.fullmatch(tok):
         if "." in tok or "e" in tok or "E" in tok:
             return float(tok)
         return int(tok)

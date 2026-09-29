@@ -55,7 +55,7 @@ the same on claude2. Tab indentation costs 12% more on claude2.
 |---|---|---|
 | null | `null` | |
 | bool | `true` / `false` | `T/F` and `1/0` were measured: no gain (E1) |
-| number | JSON number grammar: `42`, `-3.5`, `1.0`, `1e-7` | `1` (int) and `1.0` (float) stay distinct |
+| number | JSON number grammar, ASCII digits: `42`, `-3.5`, `1.0`, `1e-7` | `1` (int) and `1.0` (float) stay distinct |
 | special number | `NaN`, `Infinity`, `-Infinity` | YAML input only |
 | string (bare) | `Alice Johnson` | runs to the end of line or delimiter, depending on context |
 | string (quoted) | `"line1\nline2"` | JSON string syntax and escapes |
@@ -73,7 +73,8 @@ JSON string:
 * it starts with `"`, `[`, `{`, `&` or `#`;
 * it is `*` or `|` followed by digits only (`*12`, `|3`): a reference or a block marker;
 * it equals `null`, `true`, `false`, `NaN`, `Infinity` or `-Infinity`;
-* it matches the JSON number grammar (`"42"`, `"1.1"`, `"-0"`);
+* it matches the JSON number grammar (`"42"`, `"1.1"`, `"-0"`), even with non-ASCII digits
+  (`"1٣"`): decoders read only ASCII digits as a number, but bpp 0.4.0 read `1٣` as 13;
 * it contains the delimiter of its context: `,` in a comma table, a space in a row table (and the
   exact value `-` there), `,` or `]` in an inline list;
 * it is a list item (`- `) and contains a space (see §5).
@@ -153,6 +154,7 @@ service
   as a JSON string
   (`"first name" Alice`). Keys with Unicode letters (`şehir`) stay bare.
 * Key order is preserved.
+* A key appears at most once in an object; decoders reject a repeated key.
 
 **Measured (E2, E9):** `key value` is cheaper than `key:value` by 2.9% / 7.1% on the config,
 5.8% / 5.3% on the mixed document and 5.6% / 7.9% on the plan (o200k / claude2). The reason: a
@@ -291,7 +293,9 @@ A-2 Wilmslow sent Alan Turing
   like any other column; a keyed optional path is written `a.b=value`. When decoding, an object is
   created only if at least one of its columns is present in the row, so absent and present
   objects round-trip exactly. Flattening is used only when every row agrees: if `k` is an object
-  in one row and a plain value in another, the array is not written as a row table.
+  in one row and a plain value in another, the array is not written as a row table. The paths of
+  a header are distinct and none is a prefix of another, so every value has one column; decoders
+  reject `{a a}` and `{a a.b}`.
 * **Child tables.** `>child` alone means the child rows use the same columns (a tree, as in
   plans). `>child{...}` gives the child rows their own columns. Child rows are indented one space
   under their parent row; child tables can have their own children (`>parts{...}>subs{...}`).

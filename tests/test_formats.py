@@ -98,6 +98,14 @@ def test_csv_text_roundtrip():
     assert back == CSV_TEXT
 
 
+def test_csv_numbers_need_ascii_digits():
+    # `1５` (a full-width 5) and `2٠٢٦` are text; read as numbers they came back as 15 and 2026
+    text = "code,small\n1５,1e-05\n2٠٢٦,-2.5e-07\n"
+    rows = load_csv(text)
+    assert rows == [{"code": "1５", "small": 1e-05}, {"code": "2٠٢٦", "small": -2.5e-07}]
+    assert dump_csv(via_bpp(rows, keep_order=True)) == text
+
+
 def test_csv_employees_byte_identical(tmp_path):
     emp = ds.employees()
     text = dump_csv(emp)
