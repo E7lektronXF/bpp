@@ -271,11 +271,11 @@ PROVIDERS = {
 _THINK = re.compile(r"<think>.*?(</think>|$)", re.S)
 
 
-def ask_openai(base_url, key, model, user, max_tokens=4000, extra=None):
+def ask_openai(base_url, key, model, user, max_tokens=4000, extra=None, system=SYSTEM, temperature=0):
     """One chat completion from an OpenAI-compatible endpoint (stdlib only)."""
-    body = json.dumps({"model": model, "temperature": 0, "max_tokens": max_tokens, **(extra or {}),
-                       "messages": [{"role": "system", "content": SYSTEM},
-                                    {"role": "user", "content": user}]}).encode()
+    body = json.dumps({"model": model, "temperature": temperature, "max_tokens": max_tokens, **(extra or {}),
+                       "messages": ([{"role": "system", "content": system}] if system else [])
+                       + [{"role": "user", "content": user}]}).encode()
     req = urllib.request.Request(base_url.rstrip("/") + "/chat/completions", data=body, headers={
         "Authorization": f"Bearer {key}", "Content-Type": "application/json",
         "Accept": "application/json",
