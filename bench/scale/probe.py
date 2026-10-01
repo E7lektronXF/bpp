@@ -18,7 +18,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from common import PROVIDERS  # noqa: E402
+from common import NO_THINK, PROVIDERS  # noqa: E402
 
 CANDIDATES = [
     "google/gemma-3-4b-it", "google/gemma-3-12b-it", "google/gemma-4-31b-it",
@@ -30,9 +30,9 @@ CANDIDATES = [
 ]
 
 
-def probe(base_url: str, key: str, model: str, timeout: float) -> str:
+def probe(base_url: str, key: str, model: str, timeout: float, extra=None) -> str:
     """One tiny request, no retries: 'OK ...' or 'FAIL ...'."""
-    body = json.dumps({"model": model, "max_tokens": 200, "temperature": 0,
+    body = json.dumps({"model": model, "max_tokens": 1000, "temperature": 0, **(extra or {}),
                        "messages": [{"role": "user", "content": "Reply with the word OK."}]}).encode()
     req = urllib.request.Request(base_url.rstrip("/") + "/chat/completions", data=body, headers={
         "Authorization": f"Bearer {key}", "Content-Type": "application/json",
@@ -42,7 +42,9 @@ def probe(base_url: str, key: str, model: str, timeout: float) -> str:
         with urllib.request.urlopen(req, timeout=timeout) as r:
             d = json.load(r)
         text = (d["choices"][0]["message"].get("content") or "").strip()
-        return f"OK    {time.time() - t0:5.1f}s  {text[:30]!r}"
+        out = (d.get("usage") or {}).get("completion_tokens")
+        # many output tokens for "OK" means the model reasoned first (try --no-think)
+        return f"OK    {time.time() - t0:5.1f}s  {text[:20]!r}  output tokens: {out}"
     except urllib.error.HTTPError as e:
         return f"FAIL  HTTP {e.code}: {e.read()[:90].decode('utf-8', 'replace')}"
     except Exception as e:  # noqa: BLE001 - timeouts, connection errors: report and go on
@@ -54,13 +56,15 @@ def main():
     ap.add_argument("models", nargs="*", default=CANDIDATES)
     ap.add_argument("--provider", default="nvidia", choices=["nvidia", "groq", "openai"])
     ap.add_argument("--timeout", type=float, default=60, help="seconds per model (default 60)")
+    ap.add_argument("--no-think", action="store_true",
+                    help="send chat_template_kwargs enable_thinking=false")
     a = ap.parse_args()
     prov = PROVIDERS[a.provider]
     key = os.environ.get(prov["env"])
     if not key:
         raise SystemExit(f"{prov['env']} is not set")
     for m in a.models:
-        print(f"{m:45s} {probe(prov['base_url'], key, m, a.timeout)}", flush=True)
+        print(f"{m:45s} {probe(prov['base_url'], key, m, a.timeout, NO_THINK if a.no_think else None)}", flush=True)
     return 0
 
 

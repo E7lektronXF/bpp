@@ -49,7 +49,7 @@ TEMPLATE_TOKENS = 64
 REORDERED: set = set()  # (dataset, rows, format) whose decoded key order differs (SPEC §4.3)  # chat template overhead, kept free in the context budget
 
 # Rough prompt-processing speeds (tokens/s) on an RTX 3070 8 GB, for the time estimate only.
-PP_SPEED = {"llama3": 2500, "qwen3": 1000, "o200k": 3000, "cl100k": 1500}
+PP_SPEED = {"llama3": 2500, "qwen3": 1000, "o200k": 3000}
 
 
 def prompt_batch(fmt, text, qs):
@@ -176,6 +176,8 @@ def main():
     ap.add_argument("--model", default="llama3.2:3b")
     ap.add_argument("--host", help="Ollama URL (default $OLLAMA_HOST or http://localhost:11434)")
     ap.add_argument("--base-url", help="OpenAI-compatible endpoint (overrides the provider's)")
+    ap.add_argument("--no-think", action="store_true",
+                    help="turn off reasoning (chat_template_kwargs enable_thinking=false)")
     ap.add_argument("--num-ctx", type=int, default=32768,
                     help="context window; Ollama loads the model with it (default 32768)")
     ap.add_argument("--max-tokens", type=int, help="output limit (default: Ollama 600, groq 2000, else 4000)")
@@ -195,7 +197,7 @@ def main():
         return 0
 
     model = Model(a.provider, a.model, host=a.host, num_ctx=a.num_ctx, max_tokens=a.max_tokens,
-                  base_url=a.base_url)
+                  base_url=a.base_url, no_think=a.no_think)
     count, exact = counter(model.fam)
     built = build(a.datasets, a.sizes, a.formats)
     reqs = requests(built, a.mode, a.formats)
@@ -227,7 +229,9 @@ def main():
             print("\nKey order changed on decode (values and types equal; a column moved last):")
             print("  " + ", ".join(sorted({f"{d}/{f}" for d, _, f in REORDERED})))
         print(f"\nModel {a.model} ({a.provider}), context {a.num_ctx:,}, output limit {model.max_tokens}, "
-              f"tokenizer {model.fam}{'' if exact else ' (ESTIMATE: run --fetch-tokenizers)'}")
+              f"tokenizer {model.fam}"
+              + ("" if exact else " (estimate: cl100k + 30%)" if model.fam == "unknown"
+                 else " (ESTIMATE: run --fetch-tokenizers)"))
         tot = sum(ntok[r[0]] for r in todo)
         print(f"{len(todo)} requests x {a.repeats} repeat(s) ({a.mode} mode), "
               f"{tot * a.repeats:,} prompt tokens; {len(skipped)} cells skipped as too large:")

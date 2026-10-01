@@ -122,12 +122,15 @@ def family(model: str) -> str:
         return "deepseek_v3"
     if "gpt-oss" in m:
         return "o200k"
-    return "cl100k"
+    return "unknown"  # counted as cl100k + 30%
 
 
 @lru_cache(maxsize=None)
 def counter(fam: str):
     """(count function, exact?) for a tokenizer family; falls back to cl100k + 30%."""
+    if fam == "unknown":
+        base, _ = counter("cl100k")
+        return (lambda s: int(base(s) * 1.3) + 1), False
     if fam in TOKENIZER_PKGS:
         path = TOK_DIR / f"{fam}.json"
         try:
@@ -174,11 +177,14 @@ def ask_ollama(host, model, system, user, num_ctx, num_predict, temperature=0.0)
     return text, d.get("done_reason"), d.get("prompt_eval_count"), d.get("total_duration")
 
 
+NO_THINK = {"chat_template_kwargs": {"enable_thinking": False}}
+
+
 class Model:
     """provider ollama, or any OpenAI-compatible provider of run_qa.PROVIDERS."""
 
     def __init__(self, provider, model, *, host=None, num_ctx=32768, max_tokens=None,
-                 base_url=None, temperature=0.0):
+                 base_url=None, temperature=0.0, no_think=False):
         self.provider, self.model, self.temperature = provider, model, temperature
         self.fam = family(model)
         if provider == "ollama":
@@ -192,6 +198,8 @@ class Model:
             self.key = os.environ.get(prov["env"])
             self.base_url = base_url or prov["base_url"]
             self.extra = next((v for k, v in prov.get("extra", {}).items() if model.startswith(k)), None)
+            if no_think:  # vLLM/NIM-served hybrid reasoning models (Nemotron, GLM, Qwen3, ...)
+                self.extra = {**(self.extra or {}), **NO_THINK}
             self.max_tokens = max_tokens or prov.get("max_tokens", 4000)
             self.ctx = num_ctx
 

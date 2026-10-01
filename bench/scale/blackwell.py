@@ -212,6 +212,8 @@ def main():
     ap.add_argument("--model", default="llama3.2:3b")
     ap.add_argument("--host")
     ap.add_argument("--base-url")
+    ap.add_argument("--no-think", action="store_true",
+                    help="turn off reasoning (chat_template_kwargs enable_thinking=false)")
     ap.add_argument("--num-ctx", type=int, default=65536)
     ap.add_argument("--max-tokens", type=int, default=200, help="their harness: 200")
     ap.add_argument("--temperature", type=float, default=0.2, help="their runs: 0.2")
@@ -230,7 +232,7 @@ def main():
         return 0
 
     model = Model(a.provider, a.model, host=a.host, num_ctx=a.num_ctx, max_tokens=a.max_tokens,
-                  base_url=a.base_url, temperature=a.temperature)
+                  base_url=a.base_url, temperature=a.temperature, no_think=a.no_think)
     count, exact = counter(model.fam)
     plan, skipped = [], []
     cells = {}
