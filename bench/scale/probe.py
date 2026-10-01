@@ -8,13 +8,17 @@ still answer 404 "Function ... Not found for account".)
 from __future__ import annotations
 
 import argparse
+import json
+import os
 import sys
 import time
+import urllib.error
+import urllib.request
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from common import PROVIDERS, ask_openai  # noqa: E402
+from common import PROVIDERS  # noqa: E402
 
 CANDIDATES = [
     "google/gemma-3-4b-it", "google/gemma-3-12b-it", "google/gemma-4-31b-it",
@@ -26,24 +30,37 @@ CANDIDATES = [
 ]
 
 
+def probe(base_url: str, key: str, model: str, timeout: float) -> str:
+    """One tiny request, no retries: 'OK ...' or 'FAIL ...'."""
+    body = json.dumps({"model": model, "max_tokens": 200, "temperature": 0,
+                       "messages": [{"role": "user", "content": "Reply with the word OK."}]}).encode()
+    req = urllib.request.Request(base_url.rstrip("/") + "/chat/completions", data=body, headers={
+        "Authorization": f"Bearer {key}", "Content-Type": "application/json",
+        "User-Agent": "bpp-bench/0.4 (+https://github.com/E7lektronXF/bpp)"})
+    t0 = time.time()
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            d = json.load(r)
+        text = (d["choices"][0]["message"].get("content") or "").strip()
+        return f"OK    {time.time() - t0:5.1f}s  {text[:30]!r}"
+    except urllib.error.HTTPError as e:
+        return f"FAIL  HTTP {e.code}: {e.read()[:90].decode('utf-8', 'replace')}"
+    except Exception as e:  # noqa: BLE001 - timeouts, connection errors: report and go on
+        return f"FAIL  {type(e).__name__} after {time.time() - t0:.0f}s"
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("models", nargs="*", default=CANDIDATES)
     ap.add_argument("--provider", default="nvidia", choices=["nvidia", "groq", "openai"])
+    ap.add_argument("--timeout", type=float, default=60, help="seconds per model (default 60)")
     a = ap.parse_args()
-    import os
     prov = PROVIDERS[a.provider]
     key = os.environ.get(prov["env"])
     if not key:
         raise SystemExit(f"{prov['env']} is not set")
     for m in a.models:
-        t0 = time.time()
-        try:
-            text, stop, _ = ask_openai(prov["base_url"], key, m, "Reply with the word OK.", max_tokens=200)
-            status = f"OK    {time.time() - t0:5.1f}s  {text.strip()[:30]!r}"
-        except Exception as e:  # noqa: BLE001 - report every failure and go on
-            status = "FAIL  " + str(e).replace("\n", " ")[:110]
-        print(f"{m:45s} {status}", flush=True)
+        print(f"{m:45s} {probe(prov['base_url'], key, m, a.timeout)}", flush=True)
     return 0
 
 
