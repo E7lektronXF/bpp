@@ -255,7 +255,8 @@ def prompt(fmt_name: str, text: str, qs) -> str:
 PROVIDERS = {
     "anthropic": {"env": "ANTHROPIC_API_KEY", "model": "claude-opus-5", "base_url": None},
     "nvidia": {"env": "NVIDIA_API_KEY", "model": "deepseek-ai/deepseek-v4.1-flash",
-               "base_url": "https://integrate.api.nvidia.com/v1"},
+               "base_url": "https://integrate.api.nvidia.com/v1",
+               "extra": {"openai/gpt-oss": {"reasoning_effort": "low"}}},
     # Groq's free tier allows 8k tokens per minute *including* max_tokens, and the largest
     # prompt is ~5.9k tokens: keep the output cap at 2000 and gpt-oss reasoning short.
     "groq": {"env": "GROQ_API_KEY", "model": "openai/gpt-oss-120b",
@@ -271,11 +272,11 @@ PROVIDERS = {
 _THINK = re.compile(r"<think>.*?(</think>|$)", re.S)
 
 
-def ask_openai(base_url, key, model, user, max_tokens=4000, extra=None):
+def ask_openai(base_url, key, model, user, max_tokens=4000, extra=None, system=SYSTEM, temperature=0):
     """One chat completion from an OpenAI-compatible endpoint (stdlib only)."""
-    body = json.dumps({"model": model, "temperature": 0, "max_tokens": max_tokens, **(extra or {}),
-                       "messages": [{"role": "system", "content": SYSTEM},
-                                    {"role": "user", "content": user}]}).encode()
+    body = json.dumps({"model": model, "temperature": temperature, "max_tokens": max_tokens, **(extra or {}),
+                       "messages": ([{"role": "system", "content": system}] if system else [])
+                       + [{"role": "user", "content": user}]}).encode()
     req = urllib.request.Request(base_url.rstrip("/") + "/chat/completions", data=body, headers={
         "Authorization": f"Bearer {key}", "Content-Type": "application/json",
         "Accept": "application/json",
