@@ -11,23 +11,23 @@ when it does not, why? Built after blackwell-systems' evaluation
 | `data.py` | the payloads: NetClaw's five network tables (seed 42) and blackwell's nested orders fixture |
 | `questions.py` | 15 questions per payload with computed answers: 5 lookups (2+ on values bpp interns), 3 reverse lookups, 3 counts, 2 filtered aggregates, 2 positional lookups deep in the table |
 | `taxonomy.py` | classifies every wrong answer: `pointer`, `column_shift`, `row_shift`, `count_off`, `refused_truncated`, `other` |
-| `run_scale.py` | runs the benchmark (Ollama or a free OpenAI-compatible API) and writes `bench/results/scale/<model>.{jsonl,md}` |
+| `run_scale.py` | runs the benchmark (a free OpenAI-compatible API such as NVIDIA's, or Ollama) and writes `bench/results/scale/<model>.{jsonl,md}` |
 | `blackwell.py` | ports blackwell's harness (19 questions, one request per question, temperature 0.2), checks our payloads against theirs, classifies the wrong answers in their published logs |
 | `common.py` | formats, token counting with the model's own tokenizer, model calls |
 
 ```bash
 pip install -e ".[dev]" gcf-python tokenizers
-python bench/scale/run_scale.py --fetch-tokenizers        # Llama 3 / Qwen3 tokenizers (from npm)
-python bench/scale/run_scale.py --dry-run                 # every question and answer, sizes, plan
-python bench/scale/run_scale.py --model llama3.2:3b --num-ctx 65536
-python bench/scale/run_scale.py --model qwen3:8b --num-ctx 40960
-NVIDIA_API_KEY=nvapi-... python bench/scale/run_scale.py --provider nvidia \
-    --model openai/gpt-oss-120b --num-ctx 131072
+python bench/scale/run_scale.py --fetch-tokenizers        # Llama 3 / Qwen3 / Gemma 3 / DeepSeek V3 (from npm)
+python bench/scale/run_scale.py --dry-run --provider nvidia --model google/gemma-3-4b-it --num-ctx 131072
+export NVIDIA_API_KEY=nvapi-...                           # PowerShell: $env:NVIDIA_API_KEY = "nvapi-..."
+python bench/scale/run_scale.py --provider nvidia --model google/gemma-3-4b-it --num-ctx 131072
+python bench/scale/run_scale.py --provider nvidia --model openai/gpt-oss-20b --num-ctx 131072
+python bench/scale/run_scale.py --model llama3.2:3b --num-ctx 65536   # Ollama on this machine
 
 git clone --depth 1 https://github.com/blackwell-systems/gcf ../gcf
 python bench/scale/blackwell.py --check ../gcf
 python bench/scale/blackwell.py --analyze-logs ../gcf
-python bench/scale/blackwell.py --model llama3.2:3b --num-ctx 65536 --orders 500
+python bench/scale/blackwell.py --provider nvidia --model google/gemma-3-4b-it --num-ctx 131072 --orders 500
 ```
 
 Formats: `json` (indent 2), `gcf` (`gcf-python` `encode_generic`), `bpp` (library default),

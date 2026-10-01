@@ -188,7 +188,7 @@ def main():
     ap.add_argument("--dry-run", action="store_true", help="print questions, sizes and the plan; no model calls")
     ap.add_argument("--report", action="store_true", help="rebuild the report from saved answers")
     ap.add_argument("--fetch-tokenizers", action="store_true",
-                    help="download the Llama 3 / Qwen3 tokenizers (npm) used for context checks")
+                    help="download the Llama 3 / Qwen3 / Gemma 3 / DeepSeek V3 tokenizers (npm) for context checks")
     a = ap.parse_args()
     if a.fetch_tokenizers:
         fetch_tokenizers()
@@ -219,9 +219,9 @@ def main():
             for i, q in enumerate(qs, 1):
                 tags = f" [{', '.join(q.tags)}]" if q.tags else ""
                 print(f"  {i:2}. ({q.qtype}{tags}) {q.text}\n      -> {q.expected!r}")
-        fams = sorted({"llama3", "qwen3"})
-        table, _ = size_table(built, a.formats, [f for f in fams if counter(f)[1]])
-        print("\nPayload sizes, o200k tokens (Llama 3 / Qwen3 tokenizer, when installed):\n")
+        fams = [model.fam] if exact and model.fam != "o200k" else []
+        table, _ = size_table(built, a.formats, fams)
+        print("\nPayload sizes, o200k tokens" + (f" ({model.fam} tokenizer)" if fams else "") + ":\n")
         print(table)
         if REORDERED:
             print("\nKey order changed on decode (values and types equal; a column moved last):")

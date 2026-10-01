@@ -88,12 +88,13 @@ def roundtrips(fmt: str, text: str, data, ordered: bool = False) -> bool:
 # The local models' own tokenizers are taken from npm (@lenml/tokenizer-*), since
 # Hugging Face is not reachable everywhere; they need `pip install tokenizers`.
 
-TOKENIZER_PKGS = {"llama3": "@lenml/tokenizer-llama3", "qwen3": "@lenml/tokenizer-qwen3"}
+TOKENIZER_PKGS = {"llama3": "@lenml/tokenizer-llama3", "qwen3": "@lenml/tokenizer-qwen3",
+                  "gemma3": "@lenml/tokenizer-gemma3", "deepseek_v3": "@lenml/tokenizer-deepseek_v3"}
 TOK_DIR = Path(os.environ.get("BPP_CACHE_DIR") or Path.home() / ".cache" / "bpp") / "tokenizers"
 
 
 def fetch_tokenizers() -> None:
-    """Download the Llama 3 and Qwen3 tokenizer.json files (once)."""
+    """Download the Llama 3, Qwen3, Gemma 3 and DeepSeek V3 tokenizer.json files (once)."""
     TOK_DIR.mkdir(parents=True, exist_ok=True)
     for fam, pkg in TOKENIZER_PKGS.items():
         dest = TOK_DIR / f"{fam}.json"
@@ -115,6 +116,10 @@ def family(model: str) -> str:
         return "llama3"
     if "qwen" in m:
         return "qwen3"
+    if "gemma" in m:
+        return "gemma3"
+    if "deepseek" in m:
+        return "deepseek_v3"
     if "gpt-oss" in m:
         return "o200k"
     return "cl100k"
